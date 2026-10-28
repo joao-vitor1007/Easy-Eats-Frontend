@@ -1,0 +1,118 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Novo Pedido</h1>
+    <p>Monte o pedido selecionando uma mesa e os produtos desejados.</p>
+  </header>
+
+  @if (sucesso) {
+    <div class="alerta-sucesso">
+      <i class="bi bi-check-circle"></i> Pedido enviado para a cozinha!
+    </div>
+  }
+
+  @if (erro) {
+    <div class="alerta-erro">{{ erro }}</div>
+  }
+
+  @if (avisoPosPedido) {
+    <div class="alerta-aviso">{{ avisoPosPedido }}</div>
+  }
+
+  @if (carregando) {
+    <app-carregando texto="Carregando produtos..."></app-carregando>
+  } @else {
+    <div class="wrapper">
+      <div class="conteudo">
+        <div class="dados-pedido">
+          <select class="input-busca" [(ngModel)]="mesaSelecionada">
+            <option [ngValue]="null">Selecione a mesa...</option>
+            @for (mesa of mesas; track mesa.id) {
+              <option [ngValue]="mesa.id">Mesa {{ mesa.numero }}</option>
+            }
+          </select>
+
+          <input
+            type="text"
+            placeholder="Nome do cliente (opcional)"
+            [(ngModel)]="cliente"
+            class="input-busca"
+          />
+        </div>
+
+        <div class="filtros">
+          @for (cat of categorias; track cat) {
+            <button [class.ativo]="categoriaSelecionada === cat" (click)="selecionarCategoria(cat)">
+              {{ cat }}
+            </button>
+          }
+        </div>
+
+        <div class="produtos">
+          @for (produto of produtosFiltrados(); track produto.id) {
+            <div class="card produto-card" (click)="adicionarAoCarrinho(produto)">
+              <div class="icone-produto">
+                <i class="bi" [ngClass]="iconeCategoria(produto.categoria?.nome)"></i>
+              </div>
+              <div class="info">
+                <h4>{{ produto.nome }}</h4>
+                <span class="preco-destaque">R$ {{ produto.preco.toFixed(2) }}</span>
+              </div>
+              <button
+                type="button"
+                class="adicionar-produto"
+                (click)="adicionarAoCarrinho(produto); $event.stopPropagation()"
+              >
+                Adicionar
+              </button>
+            </div>
+          } @empty {
+            <p class="vazio">Nenhum produto cadastrado ainda.</p>
+          }
+        </div>
+      </div>
+
+      @if (carrinho.length > 0) {
+        <div class="carrinho">
+          <h3><i class="bi bi-cart3"></i> Carrinho ({{ carrinho.length }})</h3>
+
+          @for (item of carrinho; track item.id; let i = $index) {
+            <div class="item">
+              <div class="left">
+                <span class="icone-produto icone-produto--sm">
+                  <i class="bi" [ngClass]="iconeCategoria(item.produto.categoria?.nome)"></i>
+                </span>
+                <div class="item-info">
+                  <span class="nome">{{ item.produto.nome }}</span>
+                </div>
+              </div>
+
+              <div class="right">
+                <div class="qtd">
+                  <button type="button" (click)="diminuirQtd(i)">−</button>
+                  <span>{{ item.qtd }}</span>
+                  <button type="button" (click)="aumentarQtd(i)">+</button>
+                </div>
+                <span class="preco">R$ {{ (precoUnitario(item) * item.qtd).toFixed(2) }}</span>
+              </div>
+            </div>
+          }
+
+          <hr />
+
+          <div class="total">
+            <span>Total</span>
+            <strong>R$ {{ total().toFixed(2) }}</strong>
+          </div>
+
+          @if (!podeFinalizar()) {
+            <small class="aviso-finalizar">Selecione uma mesa para finalizar.</small>
+          }
+
+          <button class="finalizar" [disabled]="!podeFinalizar() || enviando" (click)="confirmarPedido()">
+            {{ enviando ? 'Enviando...' : 'Finalizar Pedido' }}
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>

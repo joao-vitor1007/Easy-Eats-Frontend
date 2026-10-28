@@ -1,0 +1,29 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Olá, bem-vindo de volta</h1>
+    <p>O que você precisa fazer agora?</p>
+  </header>
+
+  <div class="grid-acoes">
+    @for (acao of acoes; track acao.label) {
+      <button type="button" class="acao-card" (click)="acessarRota(acao.rota)">
+        <div class="acao-icon" [ngClass]="acao.cor">
+          <i class="bi" [ngClass]="acao.icon"></i>
+        </div>
+        <div class="acao-texto">
+          <strong>{{ acao.label }}</strong>
+          <span>{{ acao.descricao }}</span>
+        </div>
+        <i class="bi bi-arrow-right acao-seta"></i>
+      </button>
+    }
+  </div>
+
+  <section class="painel">
+    <h3>Resumo rápido</h3>
+    <p class="texto-apoio">
+      Use o menu lateral para navegar entre Pedido, Cozinha, Estoque e Financeiro.
+      O <strong>Dashboard</strong> traz a visão completa da operação em tempo real.
+    </p>
+  </section>
+</div>

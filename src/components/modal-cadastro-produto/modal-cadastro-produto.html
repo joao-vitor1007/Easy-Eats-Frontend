@@ -1,0 +1,25 @@
+@if (produto) {
+  <div class="modal-overlay" (click)="fecharModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      
+      <button class="btn-fechar" (click)="fecharModal()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+
+      <div class="modal-header sem-borda">
+        <div class="icone-sucesso">
+          <i class="bi bi-check-circle-fill" style="font-size: 56px; color: #4CAF50;"></i>
+        </div>
+        <h3>Produto Cadastrado!</h3>
+        <span class="subtitulo">O produto foi salvo com sucesso no sistema.</span>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-sucesso" (click)="fecharModal()">
+          Entendi
+        </button>
+      </div>
+
+    </div>
+  </div>
+}

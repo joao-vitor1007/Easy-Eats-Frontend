@@ -1,0 +1,168 @@
+@import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css');
+
+:host {
+  display: block;
+  width: 100%;
+  font-family: Inter, 'Poppins', sans-serif;
+}
+
+.pagina {
+  padding: 24px 28px 60px;
+  box-sizing: border-box;
+}
+
+.topo {
+  margin-bottom: 24px;
+}
+
+.topo h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.topo p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14.5px;
+}
+
+.painel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.barra-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.input-busca {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.input-busca:focus {
+  outline: none;
+  border-color: #f97316;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
+.barra-filtros select {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  font-size: 13.5px;
+  background: #fff;
+  color: #374151;
+}
+
+.tabela-wrap {
+  overflow-x: auto;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.tabela thead th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #9ca3af;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.tabela tbody td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  white-space: nowrap;
+}
+
+.tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tabela tbody tr:hover {
+  background: #fafafa;
+}
+
+.celula-id {
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.celula-nome {
+  color: #111827;
+  font-weight: 600;
+}
+
+.celula-muted {
+  color: #6b7280;
+}
+
+.celula-acao {
+  text-align: right;
+}
+
+.badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge.sucesso { background: #ecfdf5; color: #16a34a; }
+.badge.alerta { background: #fff7ed; color: #ea580c; }
+.badge.erro { background: #fef2f2; color: #dc2626; }
+.badge.neutro { background: #f3f4f6; color: #6b7280; }
+.badge.roxo { background: #f5f3ff; color: #7c3aed; }
+.badge.azul { background: #eff6ff; color: #2563eb; }
+
+.btn-icone {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-icone:hover {
+  background: #f8f5f2;
+  color: #111827;
+}
+
+.vazio {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 20px 0;
+  margin: 0;
+}
+
+@media (max-width: 680px) {
+  .pagina {
+    padding: 20px 16px 60px;
+  }
+}

@@ -1,0 +1,97 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Clientes</h1>
+    <p>Cadastre e gerencie os clientes do estabelecimento</p>
+  </header>
+
+  @if (erro) {
+    <p class="vazio">{{ erro }}</p>
+  }
+
+  <div class="grid-duas-colunas">
+    <section class="painel">
+      <h3>{{ editandoId !== null ? 'Editar Cliente' : 'Novo Cliente' }}</h3>
+
+      <form [formGroup]="form" (ngSubmit)="salvar()">
+        <div class="campo">
+          <label>Nome</label>
+          <input type="text" placeholder="Ex: Ana Paula Ferreira" formControlName="nome" />
+          @if (form.get('nome')?.touched && form.get('nome')?.errors?.['required']) {
+            <small class="erro">Nome é obrigatório.</small>
+          }
+        </div>
+
+        <div class="campo">
+          <label>Telefone</label>
+          <input type="text" placeholder="(11) 98765-4321" formControlName="telefone" />
+          @if (form.get('telefone')?.touched && form.get('telefone')?.errors?.['required']) {
+            <small class="erro">Telefone é obrigatório.</small>
+          }
+        </div>
+
+        <div class="campo">
+          <label>Email</label>
+          <input type="email" placeholder="email@exemplo.com" formControlName="email" />
+          @if (form.get('email')?.touched && form.get('email')?.errors?.['required']) {
+            <small class="erro">Email é obrigatório.</small>
+          }
+          @if (form.get('email')?.touched && form.get('email')?.errors?.['email']) {
+            <small class="erro">Email inválido.</small>
+          }
+        </div>
+
+        <div class="campo">
+          <label>Endereço (opcional)</label>
+          <input type="text" placeholder="Rua, número, bairro" formControlName="endereco" />
+        </div>
+
+        <div class="acoes-form">
+          <button type="submit" class="btn-salvar" [disabled]="salvando">
+            {{ editandoId !== null ? 'Salvar Alterações' : 'Adicionar Cliente' }}
+          </button>
+
+          @if (editandoId !== null) {
+            <button type="button" class="btn-cancelar" (click)="cancelarEdicao()">Cancelar</button>
+          }
+        </div>
+      </form>
+    </section>
+
+    <section class="painel">
+      <h3>Clientes Cadastrados</h3>
+
+      <div class="campo campo-busca">
+        <input type="text" placeholder="Buscar por nome..." [(ngModel)]="busca" [ngModelOptions]="{ standalone: true }" />
+      </div>
+
+      @if (carregando) {
+        <p class="vazio">Carregando clientes...</p>
+      } @else {
+        <div class="lista">
+          @for (cliente of clientesFiltrados; track cliente.id) {
+            <div class="linha">
+              <div class="info">
+                <strong>{{ cliente.nome }}</strong>
+                <span>{{ cliente.telefone }} · {{ cliente.email }}</span>
+              </div>
+
+              <div class="direita">
+                @if (cliente.saldoCashback) {
+                  <span class="badge">{{ cliente.saldoCashback | currency: 'BRL' }} cashback</span>
+                }
+                <button type="button" class="btn-icone" (click)="editar(cliente)" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="btn-icone" (click)="excluir(cliente)" title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <p class="vazio">Nenhum cliente encontrado.</p>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</div>

@@ -1,0 +1,90 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Controle de Estoque</h1>
+    <p>Cadastre insumos e acompanhe as quantidades disponíveis</p>
+  </header>
+
+  @if (erro) {
+    <p class="vazio">{{ erro }}</p>
+  }
+
+  <div class="grid-resumo">
+    <div class="resumo-card">
+      <div class="resumo-valor">{{ totalItens }}</div>
+      <div class="resumo-label">Insumos cadastrados</div>
+    </div>
+  </div>
+
+  <div class="grid-duas-colunas">
+    <section class="painel">
+      <h3>{{ editandoNome !== null ? 'Editar Insumo' : 'Novo Insumo' }}</h3>
+
+      <form [formGroup]="form" (ngSubmit)="salvar()">
+        <div class="campo">
+          <label>Nome</label>
+          <input type="text" placeholder="Ex: Pão de Hambúrguer" formControlName="nome" [readonly]="editandoNome !== null" />
+          @if (form.get('nome')?.touched && form.get('nome')?.errors?.['required']) {
+            <small class="erro">Nome é obrigatório.</small>
+          }
+        </div>
+
+        <div class="campo">
+          <label>Quantidade</label>
+          <input type="number" min="0" formControlName="quantidade" />
+          @if (form.get('quantidade')?.touched && form.get('quantidade')?.errors?.['min']) {
+            <small class="erro">Quantidade não pode ser negativa.</small>
+          }
+        </div>
+
+        <div class="campo">
+          <label>Unidade</label>
+          <input type="text" placeholder="Ex: kg, un, L" formControlName="unidade" />
+          @if (form.get('unidade')?.touched && form.get('unidade')?.errors?.['required']) {
+            <small class="erro">Unidade é obrigatória.</small>
+          }
+        </div>
+
+        <div class="acoes-form">
+          <button type="submit" class="btn-salvar" [disabled]="salvando">
+            {{ editandoNome !== null ? 'Salvar Alterações' : 'Adicionar Insumo' }}
+          </button>
+
+          @if (editandoNome !== null) {
+            <button type="button" class="btn-cancelar" (click)="cancelarEdicao()">Cancelar</button>
+          }
+        </div>
+      </form>
+    </section>
+
+    <section class="painel">
+      <h3>Estoque Atual</h3>
+
+      @if (carregando) {
+        <p class="vazio">Carregando estoque...</p>
+      } @else {
+        <div class="lista">
+          @for (insumo of insumos; track insumo.nome) {
+            <div class="linha">
+              <span class="nome">
+                <i class="bi bi-box-seam"></i>
+                {{ insumo.nome }}
+              </span>
+
+              <div class="direita">
+                <span class="info">{{ insumo.quantidade }} {{ insumo.unidade }}</span>
+                <button type="button" class="btn-icone" (click)="editar(insumo)" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="btn-icone" (click)="remover(insumo)" title="Remover">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <p class="vazio">Nenhum insumo cadastrado.</p>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</div>

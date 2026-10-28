@@ -1,0 +1,104 @@
+<div class="layout">
+  @if (menuMobileAberto()) {
+    <div class="backdrop-mobile" (click)="fecharMenuMobile()"></div>
+  }
+
+  <app-sidebar
+    [colapsado]="colapsado() && !menuMobileAberto()"
+    [abertoMobile]="menuMobileAberto()"
+    (alternar)="alternarSidebar()"
+  ></app-sidebar>
+
+  <main class="conteudo">
+    <header class="topbar">
+      <button
+        type="button"
+        class="btn-hamburguer"
+        (click)="alternarMenuMobile()"
+        title="Abrir menu"
+      >
+        <i class="bi bi-list"></i>
+      </button>
+
+      <div class="topbar-espaco"></div>
+
+      <button
+        type="button"
+        class="btn-icone-topo"
+        (click)="themeService.alternar()"
+        [title]="themeService.escuro() ? 'Ativar modo claro' : 'Ativar modo noturno'"
+      >
+        <i class="bi" [ngClass]="themeService.escuro() ? 'bi-sun' : 'bi-moon-stars'"></i>
+      </button>
+
+      <div class="notificacoes-wrap">
+        <button
+          type="button"
+          class="btn-icone-topo"
+          (click)="alternarNotificacoes()"
+          title="Notificações"
+        >
+          <i class="bi bi-bell"></i>
+          @if (naoLidas > 0) {
+            <span class="contador-notificacoes">{{ naoLidas }}</span>
+          }
+        </button>
+
+        @if (notificacoesAbertas()) {
+          <div class="painel-notificacoes">
+            <div class="cabecalho-notificacoes">
+              <strong>Notificações</strong>
+              <button type="button" (click)="marcarTodasComoLidas()">Marcar todas como lidas</button>
+            </div>
+
+            <div class="lista-notificacoes">
+              @for (n of notificacoes; track n.titulo) {
+                <div class="notificacao" [class.nao-lida]="!n.lida">
+                  <div class="notificacao-icone" [ngClass]="n.cor">
+                    <i class="bi" [ngClass]="n.icone"></i>
+                  </div>
+                  <div class="notificacao-texto">
+                    <strong>{{ n.titulo }}</strong>
+                    <span>{{ n.descricao }}</span>
+                    <small>{{ n.tempo }}</small>
+                  </div>
+                </div>
+              } @empty {
+                <p class="notificacoes-vazio">Nenhuma notificação por aqui.</p>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <button type="button" class="perfil-logado" (click)="irParaPerfil()" title="Ver meu perfil">
+        <span class="avatar">{{ iniciais }}</span>
+        <span class="perfil-texto">
+          <strong>{{ authService.usuario()?.nome }}</strong>
+          <span
+            class="badge-perfil"
+            [class.operador]="authService.usuario()?.role === 'OPERADOR'"
+            [class.superadmin]="authService.isSuperadmin()"
+            [class.garcom]="authService.isGarcom()"
+          >
+            @if (authService.isSuperadmin()) {
+              Superadmin
+            } @else if (authService.isAdministrador()) {
+              Administrador
+            } @else if (authService.isGarcom()) {
+              Garçom
+            } @else {
+              Operador
+            }
+          </span>
+        </span>
+      </button>
+
+      <button type="button" class="btn-sair" (click)="sair()" title="Sair">
+        <i class="bi bi-box-arrow-right"></i>
+      </button>
+    </header>
+
+    <router-outlet></router-outlet>
+  </main>
+</div>

@@ -1,0 +1,50 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Mesas</h1>
+    <p>Selecione uma mesa para iniciar um pedido. O backend atual não controla ocupação ou comandas.</p>
+  </header>
+
+  @if (erro) {
+    <p class="vazio">{{ erro }}</p>
+  }
+
+  <div class="grid-stats">
+    <div class="stat-card">
+      <div class="stat-label">Mesas Livres</div>
+      <div class="stat-valor">{{ totalLivres }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Mesas Ocupadas</div>
+      <div class="stat-valor">{{ totalOcupadas }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Mesas Reservadas</div>
+      <div class="stat-valor">{{ totalReservadas }}</div>
+    </div>
+  </div>
+
+  <section class="painel">
+    <h3>Mapa de Mesas</h3>
+
+    @if (carregando) {
+      <p class="vazio">Carregando mesas...</p>
+    } @else {
+      <div class="grid-mesas">
+        @for (mesa of mesas; track mesa.id) {
+          <button
+            type="button"
+            class="cartao-mesa"
+            [disabled]="abrindoMesaId === mesa.id"
+            (click)="selecionarMesa(mesa)"
+          >
+            <i class="bi bi-grid-3x3-gap-fill"></i>
+            <span class="numero-mesa">Mesa {{ mesa.numero }}</span>
+            <span class="badge" [ngClass]="badgeClasse(mesa.status)">{{ rotulo(mesa.status) }}</span>
+          </button>
+        } @empty {
+          <p class="vazio">Nenhuma mesa cadastrada.</p>
+        }
+      </div>
+    }
+  </section>
+</div>

@@ -1,0 +1,81 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Categorias</h1>
+    <p>Organize produtos e insumos por categoria</p>
+  </header>
+
+  @if (erro) {
+    <p class="vazio">{{ erro }}</p>
+  }
+
+  <div class="grid-duas-colunas">
+    <section class="painel">
+      <h3>{{ editandoId !== null ? 'Editar Categoria' : 'Nova Categoria' }}</h3>
+
+      <form [formGroup]="form" (ngSubmit)="salvar()">
+        <div class="campo">
+          <label>Nome</label>
+          <input type="text" placeholder="Ex: Lanches" formControlName="nome" />
+          @if (form.get('nome')?.touched && form.get('nome')?.errors?.['required']) {
+            <small class="erro">Nome é obrigatório.</small>
+          }
+        </div>
+
+        <div class="campo">
+          <label>Descrição</label>
+          <input type="text" placeholder="Opcional" formControlName="descricao" />
+        </div>
+
+        <div class="campo campo-checkbox">
+          <label>
+            <input type="checkbox" formControlName="flativo" />
+            Categoria ativa
+          </label>
+        </div>
+
+        <div class="acoes-form">
+          <button type="submit" class="btn-salvar" [disabled]="salvando">
+            {{ editandoId !== null ? 'Salvar Alterações' : 'Adicionar Categoria' }}
+          </button>
+
+          @if (editandoId !== null) {
+            <button type="button" class="btn-cancelar" (click)="cancelarEdicao()">Cancelar</button>
+          }
+        </div>
+      </form>
+    </section>
+
+    <section class="painel">
+      <h3>Categorias Cadastradas</h3>
+
+      @if (carregando) {
+        <p class="vazio">Carregando categorias...</p>
+      } @else {
+        <div class="lista">
+          @for (categoria of categorias; track categoria.id) {
+            <div class="linha">
+              <div class="info">
+                <strong>{{ categoria.nome }}</strong>
+                <span>{{ categoria.descricao || 'Sem descrição' }}</span>
+              </div>
+
+              <div class="direita">
+                <span class="badge" [class.ativo]="categoria.flativo">
+                  {{ categoria.flativo ? 'Ativa' : 'Inativa' }}
+                </span>
+                <button type="button" class="btn-icone" (click)="editar(categoria)" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="btn-icone" (click)="excluir(categoria)" title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <p class="vazio">Nenhuma categoria cadastrada.</p>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</div>

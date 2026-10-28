@@ -1,0 +1,100 @@
+<aside class="sidebar" [class.colapsado]="colapsado" [class.aberto-mobile]="abertoMobile">
+  <div class="topo-sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <i class="bi bi-fire"></i>
+      </div>
+
+      @if (!colapsado) {
+        <div class="brand-text">
+          <strong>Easy Eats</strong>
+          <span>{{ authService.isSuperadmin() ? 'Painel da Plataforma' : 'Food Truck ERP' }}</span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <button
+    type="button"
+    class="btn-recolher"
+    (click)="alternar.emit()"
+    [title]="colapsado ? 'Expandir menu' : 'Recolher menu'"
+  >
+    <i class="bi" [ngClass]="colapsado ? 'bi-chevron-right' : 'bi-chevron-left'"></i>
+  </button>
+
+  @if (!colapsado) {
+    <div class="titulo-menu">Menu</div>
+  }
+
+  <nav class="menu">
+    @for (item of itens; track item.label) {
+      @if (item.filhos) {
+        @if (colapsado) {
+          <a
+            class="menu-item"
+            [style.--cor-grupo]="item.cor"
+            [routerLink]="primeiroFilho(item)"
+            routerLinkActive="ativo"
+            [title]="item.label"
+          >
+            <i class="bi" [ngClass]="item.icon"></i>
+          </a>
+        } @else {
+          <button
+            type="button"
+            class="menu-item menu-item-grupo"
+            [style.--cor-grupo]="item.cor"
+            (click)="alternarGrupo(item.label)"
+          >
+            <i class="bi" [ngClass]="item.icon"></i>
+            <span>{{ item.label }}</span>
+            <i class="bi chevron-grupo" [ngClass]="grupoAberto(item.label) ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
+          </button>
+
+          @if (grupoAberto(item.label)) {
+            <div class="submenu" [style.--cor-grupo]="item.cor">
+              @for (filho of item.filhos; track filho.label) {
+                @if (filho.rota) {
+                  <a class="submenu-item" [routerLink]="filho.rota" routerLinkActive="ativo">
+                    <i class="bi" [ngClass]="filho.icon"></i>
+                    <span>{{ filho.label }}</span>
+                  </a>
+                } @else {
+                  <span class="submenu-item desabilitado" title="Em breve">
+                    <i class="bi" [ngClass]="filho.icon"></i>
+                    <span>{{ filho.label }}</span>
+                    <small>em breve</small>
+                  </span>
+                }
+              }
+            </div>
+          }
+        }
+      } @else if (item.rota) {
+        <a
+          class="menu-item"
+          [routerLink]="item.rota"
+          routerLinkActive="ativo"
+          [title]="colapsado ? item.label : ''"
+        >
+          <i class="bi" [ngClass]="item.icon"></i>
+          @if (!colapsado) {
+            <span>{{ item.label }}</span>
+          }
+        </a>
+      } @else {
+        <span
+          class="menu-item desabilitado"
+          [title]="colapsado ? item.label + ' (em breve)' : 'Em breve'"
+        >
+          <i class="bi" [ngClass]="item.icon"></i>
+          @if (!colapsado) {
+            <span>{{ item.label }}</span>
+            <small>em breve</small>
+          }
+        </span>
+      }
+    }
+  </nav>
+</aside>

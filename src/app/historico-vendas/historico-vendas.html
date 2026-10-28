@@ -1,0 +1,80 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Histórico de Vendas</h1>
+    <p>Consulte os pedidos realizados e filtre por status</p>
+  </header>
+
+  @if (erro) {
+    <p class="vazio">{{ erro }}</p>
+  }
+
+  <div class="grid-resumo">
+    <div class="resumo-card">
+      <div class="resumo-icon verde"><i class="bi bi-cash-stack"></i></div>
+      <div>
+        <div class="resumo-valor">{{ totalFiltrado | currency: 'BRL' }}</div>
+        <div class="resumo-label">Valor total</div>
+      </div>
+    </div>
+
+    <div class="resumo-card">
+      <div class="resumo-icon azul"><i class="bi bi-receipt"></i></div>
+      <div>
+        <div class="resumo-valor">{{ totalVendas }}</div>
+        <div class="resumo-label">Pedidos</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="painel">
+    <input
+      type="text"
+      placeholder="Buscar por mesa/cliente ou #pedido"
+      class="input-busca"
+      [(ngModel)]="busca"
+    />
+
+    <div class="filtros">
+      @for (filtro of filtros; track filtro) {
+        <button
+          [class.ativo]="filtroSelecionado === filtro"
+          (click)="selecionarFiltro(filtro)"
+        >
+          {{ filtro }}
+        </button>
+      }
+    </div>
+
+    @if (carregando) {
+      <p class="vazio">Carregando pedidos...</p>
+    } @else {
+      <div class="lista">
+        @for (venda of vendasFiltradas; track venda.id) {
+          <div class="card-pedido">
+            <div class="top">
+              <strong>#{{ venda.id }} {{ identificacao(venda) }}</strong>
+              <span class="status {{ venda.status.toLowerCase() }}">
+                {{ venda.status }}
+              </span>
+            </div>
+
+            <div class="itens">
+              @for (item of venda.itens; track item.id) {
+                <p>{{ item.produto.nome }} x{{ item.quantidade }}</p>
+              }
+            </div>
+
+            <div class="footer">
+              <span>{{ venda.tipo }}</span>
+              <strong class="valor-pedido">
+                {{ totalVenda(venda) | currency: 'BRL' }}
+              </strong>
+            </div>
+          </div>
+        } @empty {
+          <p class="vazio">Nenhum pedido encontrado.</p>
+        }
+      </div>
+    }
+  </section>
+</div>

@@ -1,0 +1,233 @@
+@import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css');
+
+/* Fundo escuro atrás do modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(3px); /* Efeito de desfoque moderno */
+}
+
+/* Caixa principal do modal */
+.modal-content {
+  background: white;
+  width: 90%;
+  max-width: 380px;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 8px;
+  padding: 24px;
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  animation: slideUp 0.3s ease-out;
+
+  &--largo {
+    max-width: 440px;
+  }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Botão de Fechar */
+.btn-fechar {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #555;
+  transition: 0.2s;
+}
+
+.btn-fechar:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Header */
+.modal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border-bottom: 1px solid #eaeaea;
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+}
+
+.icone-grande {
+  width: 76px;
+  height: 76px;
+  border-radius: 8px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #fff7ed;
+  color: var(--color-primary);
+  font-size: 34px;
+
+  margin-bottom: 14px;
+}
+
+.modal-header h3 {
+  margin: 0 0 5px 0;
+  font-size: 22px;
+  color: #222;
+}
+
+.preco-destaque {
+  color: var(--color-primary);
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* Body */
+.descricao {
+  color: #666;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+/* Composição / Adicionais / Observação */
+.carregando-detalhes {
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  margin: 12px 0;
+}
+
+.secao {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eaeaea;
+
+  h4 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    color: #222;
+  }
+
+  .ajuda {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: #999;
+  }
+}
+
+.lista-composicao {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linha-composicao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #333;
+  transition: color 0.2s ease;
+
+  &.removido {
+    color: #b0b0b0;
+    text-decoration: line-through;
+  }
+}
+
+.lista-adicionais {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.linha-adicional {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #333;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  input[type='checkbox'] {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .preco-adicional {
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: 13px;
+  }
+}
+
+.campo-observacao {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: #333;
+  background: #fafafa;
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    background: #fff;
+  }
+}
+
+/* Footer */
+.btn-adicionar {
+  width: 100%;
+  padding: 14px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-adicionar:hover {
+  background: var(--color-primary-hover);
+}

@@ -1,0 +1,88 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Novo Produto</h1>
+    <p>Cadastre um produto usando os campos suportados pela API.</p>
+  </header>
+
+  @if (erro) {
+    <div class="alerta-erro">{{ erro }}</div>
+  }
+
+  <div class="card-form">
+    <form [formGroup]="form" (ngSubmit)="salvar()">
+      <div class="input-group">
+        <label>Nome do Produto</label>
+        <input type="text" placeholder="Ex: Hambúrguer Clássico" formControlName="nome" />
+      </div>
+
+      <div class="input-group">
+        <label>Descrição</label>
+        <input type="text" placeholder="Descrição do produto" formControlName="descricao" />
+      </div>
+
+      <div class="input-group">
+        <label>Categoria</label>
+        <select formControlName="categoriaId">
+          <option [ngValue]="null">Selecione...</option>
+          @for (categoria of categorias; track categoria.id) {
+            <option [ngValue]="categoria.id">{{ categoria.nome }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label>Preço (R$)</label>
+        <input type="number" step="0.01" min="0.01" placeholder="0.00" formControlName="preco" />
+      </div>
+
+      <div class="input-group input-group--toggle">
+        <app-toggle-switch
+          [checked]="form.controls.flAtivo.value"
+          label="Produto ativo"
+          (checkedChange)="form.controls.flAtivo.setValue($event)"
+        ></app-toggle-switch>
+      </div>
+
+      <p class="ajuda">
+        A API fornecida não possui campos persistidos para custo, natureza, adicionais ou composição do produto.
+      </p>
+
+      <div class="actions">
+        <button type="submit" class="btn-save" [disabled]="form.invalid || enviando">
+          <span>+</span> {{ enviando ? 'Salvando...' : 'Cadastrar Produto' }}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <section class="lista-produtos">
+    <h2>Produtos cadastrados</h2>
+
+    @if (carregando) {
+      <app-carregando texto="Carregando produtos..."></app-carregando>
+    } @else if (produtos.length === 0) {
+      <p class="vazio">Nenhum produto cadastrado ainda.</p>
+    } @else {
+      @for (produto of produtos; track produto.id) {
+        <div class="produto-item">
+          <div class="produto-item__header">
+            <div class="produto-item__info">
+              <strong>{{ produto.nome }}</strong>
+              <span>{{ produto.categoria?.nome ?? 'Sem categoria' }}</span>
+            </div>
+            <span class="preco">R$ {{ produto.preco.toFixed(2) }}</span>
+            <span class="badge-natureza">{{ produto.flAtivo ? 'Ativo' : 'Inativo' }}</span>
+          </div>
+        </div>
+      }
+    }
+  </section>
+
+  @if (produtoParaConfirmar) {
+    <app-modal-cadastro-produto
+      [produto]="produtoParaConfirmar"
+      (fechar)="fecharModalConfirmacao()"
+      (cadastrar)="fecharModalConfirmacao()">
+    </app-modal-cadastro-produto>
+  }
+</div>

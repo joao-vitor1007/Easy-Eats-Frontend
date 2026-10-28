@@ -1,0 +1,43 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Ficha Técnica</h1>
+    <p>Insumos e custo de produção de cada produto do cardápio</p>
+  </header>
+
+  <div class="lista-produtos">
+    @for (produto of produtos; track produto.id) {
+      <section class="painel produto-card">
+        <button type="button" class="cabecalho-produto" (click)="alternarExpansao(produto)">
+          <span class="titulo">
+            <i class="bi" [ngClass]="produto.icone"></i>
+            {{ produto.nome }}
+          </span>
+
+          <span class="direita">
+            <span class="badge neutro">Custo: R$ {{ custoTotal(produto) | number: '1.2-2' }}</span>
+            <i class="bi" [ngClass]="produto.expandido ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+          </span>
+        </button>
+
+        @if (produto.expandido) {
+          <div class="lista">
+            @for (insumo of produto.insumos; track insumo.nome) {
+              <div class="linha">
+                <div class="info">
+                  <strong>{{ insumo.nome }}</strong>
+                  <span>{{ insumo.quantidade }}</span>
+                </div>
+
+                <div class="direita">
+                  <span>R$ {{ insumo.custoUnitario | number: '1.2-2' }} / unid.</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    } @empty {
+      <p class="vazio">Nenhum produto cadastrado.</p>
+    }
+  </div>
+</div>

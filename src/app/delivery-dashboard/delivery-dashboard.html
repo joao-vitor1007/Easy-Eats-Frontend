@@ -1,0 +1,56 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Delivery Dashboard</h1>
+    <p>Acompanhamento em tempo real das entregas em andamento</p>
+  </header>
+
+  <div class="grid-stats">
+    <div class="stat-card">
+      <div class="stat-label">Pedidos em Rota</div>
+      <div class="stat-valor">{{ pedidosEmRota }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Tempo Médio de Entrega</div>
+      <div class="stat-valor">{{ tempoMedioEntrega }} min</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Entregadores Ativos</div>
+      <div class="stat-valor">{{ entregadoresAtivos }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Entrega no Prazo</div>
+      <div class="stat-valor">{{ taxaNoPrazo }}%</div>
+    </div>
+  </div>
+
+  <section class="painel">
+    <h3>Pedidos em Entrega</h3>
+
+    @if (pedidos.length) {
+      <div class="lista">
+        @for (pedido of pedidos; track pedido.cliente) {
+          <div class="linha">
+            <div class="dados-pedido">
+              <div class="cliente">
+                <i class="bi bi-person"></i>
+                {{ pedido.cliente }}
+              </div>
+              <div class="endereco">
+                <i class="bi bi-geo-alt"></i>
+                {{ pedido.endereco }}
+              </div>
+              <div class="entregador">
+                <i class="bi bi-bicycle"></i>
+                {{ pedido.entregador }}
+              </div>
+            </div>
+
+            <span class="badge" [ngClass]="classeBadge(pedido.status)">{{ pedido.status }}</span>
+          </div>
+        }
+      </div>
+    } @else {
+      <p class="vazio">Nenhum pedido em entrega no momento.</p>
+    }
+  </section>
+</div>

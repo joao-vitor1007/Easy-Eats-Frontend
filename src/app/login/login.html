@@ -1,0 +1,90 @@
+<div class="tela-auth">
+  <section class="painel-marca">
+    <div class="marca-conteudo">
+      <div class="logo">
+        <img src="/assets/images/logo-easyeats-carrinho2.png" alt="Logo EasyEats" />
+      </div>
+
+      <h1>Easy<span>Eats</span></h1>
+      <p class="tagline">O jeito mais simples de operar seu food truck, do pedido ao caixa.</p>
+
+      <ul class="destaques">
+        <li><i class="bi bi-lightning-charge"></i> Pedidos e cozinha em tempo real</li>
+        <li><i class="bi bi-box-seam"></i> Estoque sempre sob controle</li>
+        <li><i class="bi bi-graph-up-arrow"></i> Financeiro claro, sem planilha</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="painel-form">
+    <div class="auth-card">
+      @if (!modoRecuperarSenha) {
+        <div class="cabecalho-form">
+          <h2>Bem-vindo de volta</h2>
+          <p>Entre com sua conta para continuar</p>
+        </div>
+
+        @if (erro) {
+          <div class="alerta-erro">
+            <i class="bi bi-exclamation-circle"></i> {{ erro }}
+          </div>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="handleLogin()">
+          <div class="form-group">
+            <label [attr.for]="campoEmailLogin.inputId">Usuário</label>
+            <app-campo-texto
+              #campoEmailLogin
+              type="text"
+              icone="bi-person"
+              placeholder="seu usuário ou email"
+              autocomplete="username"
+              formControlName="email"
+            ></app-campo-texto>
+
+            <small *ngIf="form.get('email')?.touched && form.get('email')?.errors">
+              <span *ngIf="form.get('email')?.errors?.['required']">
+                <p class="msg-validacoes">{{ mensagensValidacoes.email.required }}</p>
+              </span>
+            </small>
+          </div>
+
+          <div class="form-group">
+            <div class="linha-label">
+              <label [attr.for]="campoSenhaLogin.inputId">Senha</label>
+              <button type="button" class="link-recuperar" (click)="abrirRecuperarSenha()">
+                Esqueceu a senha?
+              </button>
+            </div>
+
+            <app-campo-senha #campoSenhaLogin formControlName="password"></app-campo-senha>
+
+            <small *ngIf="form.get('password')?.touched && form.get('password')?.errors">
+              <p class="msg-validacoes">{{ mensagensValidacoes.password.required }}</p>
+            </small>
+          </div>
+
+          <button type="submit" class="btn-entrar" [disabled]="enviando">
+            {{ enviando ? 'Entrando...' : 'Entrar' }} <i class="bi bi-arrow-right"></i>
+          </button>
+        </form>
+      } @else {
+        <button type="button" class="link-voltar" (click)="voltarParaLogin()">
+          <i class="bi bi-arrow-left"></i> Voltar para o login
+        </button>
+
+        <div class="cabecalho-form">
+          <h2>Recuperar senha</h2>
+          <p>Redefinição automática ainda não está disponível</p>
+        </div>
+
+        <div class="confirmacao-envio">
+          <i class="bi bi-info-circle"></i>
+          <p>Por enquanto, a redefinição de senha é feita por um administrador do seu restaurante. Entre em contato com ele para receber uma nova senha.</p>
+        </div>
+      }
+
+      <p class="footer">EasyEats POS © {{ currentYear }}</p>
+    </div>
+  </section>
+</div>

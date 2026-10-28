@@ -1,0 +1,106 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Segmentos de Negócio</h1>
+    <p>Defina categorias como "Food Truck" ou "Restaurante" e quais módulos cada uma libera para as empresas clientes</p>
+  </header>
+
+  @if (erro) {
+    <div class="alerta-erro">{{ erro }}</div>
+  }
+
+  <div class="grid-duas-colunas">
+    <section class="painel">
+      <h3>{{ editandoId !== null ? 'Editar Segmento' : 'Novo Segmento' }}</h3>
+
+      <form [formGroup]="form" (ngSubmit)="salvar()">
+        <div class="campo">
+          <label>Nome do Segmento</label>
+          <input type="text" placeholder="Ex: Food Truck" formControlName="nome" />
+          @if (form.get('nome')?.touched && form.get('nome')?.errors?.['required']) {
+            <small class="erro">Nome é obrigatório.</small>
+          }
+        </div>
+
+        <div class="campo">
+          <label>Descrição</label>
+          <input type="text" placeholder="Breve descrição do segmento" formControlName="descricao" />
+        </div>
+
+        <div class="campo campo-checkbox">
+          <label>
+            <input type="checkbox" formControlName="flAtivo" />
+            Segmento ativo
+          </label>
+        </div>
+
+        <div class="campo">
+          <label>Módulos liberados para esse segmento</label>
+          <div class="lista-funcionalidades">
+            @for (codigo of todasFuncionalidades; track codigo) {
+              <label class="item-funcionalidade">
+                <input
+                  type="checkbox"
+                  [checked]="funcionalidadeMarcada(codigo)"
+                  (change)="alternarFuncionalidade(codigo)"
+                />
+                {{ funcionalidadeLabels[codigo] }}
+              </label>
+            }
+          </div>
+        </div>
+
+        <div class="acoes-form">
+          <button type="submit" class="btn-salvar">
+            {{ editandoId !== null ? 'Salvar Alterações' : 'Adicionar Segmento' }}
+          </button>
+
+          @if (editandoId !== null) {
+            <button type="button" class="btn-cancelar" (click)="cancelarEdicao()">Cancelar</button>
+          }
+        </div>
+      </form>
+    </section>
+
+    <section class="painel">
+      <h3>Segmentos Cadastrados</h3>
+
+      <input
+        type="text"
+        class="input-busca"
+        placeholder="Buscar por nome..."
+        [(ngModel)]="termoBusca"
+        [ngModelOptions]="{ standalone: true }"
+      />
+
+      <div class="lista">
+        @if (carregando) {
+          <p class="vazio">Carregando...</p>
+        } @else {
+          @for (segmento of segmentosFiltrados; track segmento.id) {
+            <div class="linha">
+              <div class="info">
+                <strong>{{ segmento.nome }}</strong>
+                <span>{{ segmento.descricao || 'Sem descrição' }}</span>
+                <span class="contagem-funcionalidades">{{ segmento.funcionalidades.length }} módulo(s) liberado(s)</span>
+              </div>
+
+              <div class="direita">
+                <span class="badge" [ngClass]="segmento.flAtivo ? 'sucesso' : 'erro'">
+                  {{ segmento.flAtivo ? 'Ativo' : 'Inativo' }}
+                </span>
+                <button type="button" class="btn-icone" (click)="editar(segmento)" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="btn-icone" (click)="excluir(segmento)" title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <p class="vazio">Nenhum segmento cadastrado.</p>
+          }
+        }
+      </div>
+    </section>
+  </div>
+</div>

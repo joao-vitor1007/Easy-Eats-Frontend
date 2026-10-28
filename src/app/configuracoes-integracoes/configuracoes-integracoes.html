@@ -1,0 +1,119 @@
+<div class="pagina">
+  <header class="topo">
+    <h1>Integrações</h1>
+    <p>Conecte o Easy Eats a serviços externos</p>
+  </header>
+
+  <div class="abas-integracao">
+    @for (integracao of integracoes; track integracao.chave) {
+      <button
+        type="button"
+        class="aba"
+        [class.ativa]="abaAtiva === integracao.chave"
+        (click)="selecionarAba(integracao.chave)"
+      >
+        <i class="bi" [ngClass]="integracao.icone"></i>
+        {{ integracao.nome }}
+        <span class="ponto-status" [class.ligado]="integracao.ativo"></span>
+      </button>
+    }
+  </div>
+
+  <section class="painel">
+    <div class="cabecalho-integracao">
+      <div class="titulo-integracao">
+        <i class="bi" [ngClass]="integracaoAtiva.icone"></i>
+        <div>
+          <h3>{{ integracaoAtiva.nome }}</h3>
+          <p>{{ integracaoAtiva.descricao }}</p>
+        </div>
+      </div>
+
+      <label class="switch">
+        <input type="checkbox" [(ngModel)]="integracaoAtiva.ativo" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="painel-instrucoes">
+      <h4>Como integrar</h4>
+      <ol>
+        @for (passo of integracaoAtiva.passos; track $index) {
+          <li>{{ passo.texto }}</li>
+        }
+      </ol>
+    </div>
+
+    @if (abaAtiva === 'mercadopago') {
+      <div class="campos-integracao">
+        <div class="campo">
+          <label>Access Token</label>
+          <input type="text" placeholder="APP_USR-..." [(ngModel)]="credenciais.mercadopago.accessToken" />
+        </div>
+        <div class="campo">
+          <label>Public Key</label>
+          <input type="text" placeholder="APP_USR-..." [(ngModel)]="credenciais.mercadopago.publicKey" />
+        </div>
+      </div>
+    }
+
+    @if (abaAtiva === 'ifood') {
+      <div class="campos-integracao">
+        <div class="campo">
+          <label>Client ID</label>
+          <input type="text" [(ngModel)]="credenciais.ifood.clientId" />
+        </div>
+        <div class="campo">
+          <label>Client Secret</label>
+          <input type="password" [(ngModel)]="credenciais.ifood.clientSecret" />
+        </div>
+        <div class="campo">
+          <label>Merchant ID</label>
+          <input type="text" placeholder="ID da loja no iFood" [(ngModel)]="credenciais.ifood.merchantId" />
+        </div>
+      </div>
+    }
+
+    @if (abaAtiva === 'whatsapp') {
+      <div class="campos-integracao">
+        <div class="campo">
+          <label>Phone Number ID</label>
+          <input type="text" [(ngModel)]="credenciais.whatsapp.phoneNumberId" />
+        </div>
+        <div class="campo">
+          <label>Token de Acesso</label>
+          <input type="password" [(ngModel)]="credenciais.whatsapp.accessToken" />
+        </div>
+        <div class="campo">
+          <label>Número Verificado</label>
+          <input type="text" placeholder="+55 11 90000-0000" [(ngModel)]="credenciais.whatsapp.numero" />
+        </div>
+      </div>
+    }
+
+    @if (abaAtiva === 'impressora') {
+      <div class="campos-integracao">
+        <div class="campo">
+          <label>Tipo de Conexão</label>
+          <select [(ngModel)]="credenciais.impressora.modelo">
+            <option value="rede">Rede (Ethernet — Epson ePOS-Print)</option>
+            <option value="agente">USB/Bluetooth (via agente local)</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>IP da Impressora</label>
+          <input type="text" placeholder="192.168.0.50" [(ngModel)]="credenciais.impressora.ip" />
+        </div>
+        <div class="campo">
+          <label>Porta</label>
+          <input type="text" placeholder="9100" [(ngModel)]="credenciais.impressora.porta" />
+        </div>
+      </div>
+    }
+
+    <div class="acoes-integracao">
+      <button type="button" class="btn-salvar" (click)="salvar(integracaoAtiva)">Salvar Configurações</button>
+      <button type="button" class="btn-cancelar" (click)="testarConexao(integracaoAtiva)">Testar Conexão</button>
+    </div>
+  </section>
+</div>
