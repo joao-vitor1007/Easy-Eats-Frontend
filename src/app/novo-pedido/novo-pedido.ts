@@ -1,33 +1,30 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { CarregandoComponent } from '../../components/carregando/carregando';
-import { ActivatedRoute } from '@angular/router';
 import { Produto, ProdutoService } from '../cadastro-produto/produto.service';
 import { Mesa, MesaService } from '../mesas/mesa.service';
-import { customizacaoVazia, CustomizacaoProduto } from './carrinho.model';
-import { STATUS_PEDIDO, VendaService } from './venda.service';
 import { MensagemErroApiUtil } from '../utils/mensagemErroApiUtil';
+import { VendaService } from './venda.service';
 
 const ICONE_POR_CATEGORIA: Record<string, string> = {
   Lanches: 'bi-egg-fried',
   Acompanhamentos: 'bi-basket3',
   Bebidas: 'bi-cup-straw',
+  Sobremesas: 'bi-cake2',
 };
 
 interface ItemCarrinho {
-  id: number;
   produto: Produto;
   qtd: number;
-  customizacao: CustomizacaoProduto;
 }
-
-let proximoIdCarrinho = 0;
 
 @Component({
   selector: 'app-novo-pedido',
   standalone: true,
-  imports: [CommonModule, FormsModule, CarregandoComponent],
+  imports: [CurrencyPipe, FormsModule, RouterLink, CarregandoComponent],
   templateUrl: './novo-pedido.html',
   styleUrls: ['./novo-pedido.scss'],
 })
@@ -38,148 +35,139 @@ export class NovoPedido implements OnInit {
   private route = inject(ActivatedRoute);
 
   cliente = '';
-  mesaSelecionada: number | null = null;
-  produtos: Produto[] = [];
-  mesas: Mesa[] = [];
+  mesaSelecionada = signal<number | null>(null);
+  busca = signal('');
+  categoriaSelecionada = signal('Todos');
 
-  avisoPosPedido: string | null = null;
-  categorias: string[] = ['Todos'];
-  categoriaSelecionada = 'Todos';
+  produtos = signal<Produto[]>([]);
+  mesas = signal<Mesa[]>([]);
+  carrinho = signal<ItemCarrinho[]>([]);
 
-  carregando = true;
-  enviando = false;
-  erro: string | null = null;
-  sucesso = false;
-  carrinho: ItemCarrinho[] = [];
+  carregando = signal(true);
+  enviando = signal(false);
+  erro = signal<string | null>(null);
+  sucesso = signal<string | null>(null);
 
-  // O backend fornecido exige uma mesa para criar um pedido.
-  get usaMesa(): boolean {
-    return true;
-  }
+  categorias = computed(() => {
+    const nomes = new Set(
+      this.produtos()
+        .map((produto) => produto.categoria?.nome)
+        .filter((nome): nome is string => !!nome),
+    );
+    return ['Todos', ...nomes];
+  });
+
+  produtosFiltrados = computed(() => {
+    const termo = this.busca().trim().toLowerCase();
+    const categoria = this.categoriaSelecionada();
+    return this.produtos().filter(
+      (produto) =>
+        (categoria === 'Todos' || produto.categoria?.nome === categoria) &&
+        (!termo || produto.nome.toLowerCase().includes(termo)),
+    );
+  });
+
+  total = computed(() => this.carrinho().reduce((soma, item) => soma + item.produto.preco * item.qtd, 0));
+  quantidadeItens = computed(() => this.carrinho().reduce((soma, item) => soma + item.qtd, 0));
+  podeFinalizar = computed(() => this.carrinho().length > 0 && this.mesaSelecionada() !== null && !this.enviando());
 
   ngOnInit(): void {
-    this.produtoService.listar().subscribe({
-      next: (produtos) => {
-        this.produtos = produtos.filter((produto) => produto.flAtivo);
-        const nomesCategorias = new Set(
-          this.produtos.map((produto) => produto.categoria?.nome).filter((nome): nome is string => !!nome),
-        );
-        this.categorias = ['Todos', ...nomesCategorias];
-        this.carregando = false;
-      },
-      error: (erro) => {
-        this.erro = MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar os produtos.');
-        this.carregando = false;
-      },
-    });
+    forkJoin({
+      produtos: this.produtoService.listar(),
+      mesas: this.mesaService.listar(),
+    }).subscribe({
+      next: ({ produtos, mesas }) => {
+        this.produtos.set(produtos);
+        this.mesas.set(mesas);
 
-    this.mesaService.listar().subscribe({
-      next: (mesas) => {
-        this.mesas = mesas;
         const mesaDaRota = Number(this.route.snapshot.queryParamMap.get('mesa'));
         if (mesaDaRota && mesas.some((mesa) => mesa.id === mesaDaRota)) {
-          this.mesaSelecionada = mesaDaRota;
+          this.mesaSelecionada.set(mesaDaRota);
         }
+        this.carregando.set(false);
       },
-      error: () => {
-        this.erro = 'Não foi possível carregar as mesas.';
+      error: (erro) => {
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar produtos e mesas.'));
+        this.carregando.set(false);
       },
     });
-  }
-
-  selecionarCategoria(categoria: string): void {
-    this.categoriaSelecionada = categoria;
   }
 
   iconeCategoria(nomeCategoria?: string | null): string {
-    if (!nomeCategoria) return 'bi-basket3';
-    return ICONE_POR_CATEGORIA[nomeCategoria] ?? 'bi-basket3';
+    return (nomeCategoria && ICONE_POR_CATEGORIA[nomeCategoria]) || 'bi-basket3';
   }
 
-  produtosFiltrados(): Produto[] {
-    if (this.categoriaSelecionada === 'Todos') return this.produtos;
-    return this.produtos.filter((produto) => produto.categoria?.nome === this.categoriaSelecionada);
+  semPreco(produto: Produto): boolean {
+    return !(produto.preco > 0);
+  }
+
+  quantidadeNoCarrinho(produto: Produto): number {
+    return this.carrinho().find((item) => item.produto.id === produto.id)?.qtd ?? 0;
   }
 
   adicionarAoCarrinho(produto: Produto): void {
-    const existente = this.carrinho.find((item) => item.produto.id === produto.id);
-    if (existente) {
-      existente.qtd++;
-      return;
-    }
-    this.carrinho.push({
-      id: proximoIdCarrinho++,
-      produto,
-      qtd: 1,
-      customizacao: customizacaoVazia(),
+    if (this.semPreco(produto)) return;
+
+    this.carrinho.update((itens) => {
+      const existente = itens.find((item) => item.produto.id === produto.id);
+      return existente
+        ? itens.map((item) => (item === existente ? { ...item, qtd: item.qtd + 1 } : item))
+        : [...itens, { produto, qtd: 1 }];
     });
   }
 
-  precoUnitario(item: ItemCarrinho): number {
-    // A API calcula o preço a partir do preço ativo do produto; não aceita
-    // adicionais ou preço unitário enviados pelo frontend.
-    return item.produto.preco;
+  alterarQtd(item: ItemCarrinho, delta: number): void {
+    this.carrinho.update((itens) =>
+      itens
+        .map((atual) => (atual === item ? { ...atual, qtd: atual.qtd + delta } : atual))
+        .filter((atual) => atual.qtd > 0),
+    );
   }
 
-  aumentarQtd(index: number): void {
-    this.carrinho[index].qtd++;
+  remover(item: ItemCarrinho): void {
+    this.carrinho.update((itens) => itens.filter((atual) => atual !== item));
   }
 
-  diminuirQtd(index: number): void {
-    if (this.carrinho[index].qtd > 1) {
-      this.carrinho[index].qtd--;
-    } else {
-      this.carrinho.splice(index, 1);
-    }
-  }
-
-  total(): number {
-    return this.carrinho.reduce((soma, item) => soma + this.precoUnitario(item) * item.qtd, 0);
-  }
-
-  podeFinalizar(): boolean {
-    return this.carrinho.length > 0 && this.mesaSelecionada !== null;
+  limparCarrinho(): void {
+    this.carrinho.set([]);
   }
 
   confirmarPedido(): void {
-    const mesaId = this.mesaSelecionada;
-    if (this.enviando || this.carrinho.length === 0 || mesaId === null) {
-      if (mesaId === null) {
-        this.erro = 'Selecione uma mesa para criar o pedido.';
-      }
+    const mesaId = this.mesaSelecionada();
+    if (mesaId === null) {
+      this.erro.set('Selecione uma mesa para criar o pedido.');
       return;
     }
+    if (!this.podeFinalizar()) return;
 
-    this.enviando = true;
-    this.erro = null;
+    this.enviando.set(true);
+    this.erro.set(null);
 
-    this.vendaService.criar({
-      status: STATUS_PEDIDO.AGUARDANDO,
-      mesaId,
-      cliente: this.cliente.trim() || null,
-      itens: this.carrinho.map((item) => ({
-        produtoId: item.produto.id,
-        quantidade: item.qtd,
-      })),
-    }).subscribe({
-      next: () => this.finalizarComSucesso(),
-      error: (erro) => {
-        this.enviando = false;
-        this.erro = MensagemErroApiUtil.extrair(
-          erro,
-          'Não foi possível criar o pedido. Confira a mesa, os produtos e tente novamente.',
-        );
-      },
-    });
-  }
-
-  private finalizarComSucesso(): void {
-    this.enviando = false;
-    this.sucesso = true;
-    this.carrinho = [];
-    this.cliente = '';
-    this.mesaSelecionada = null;
-    setTimeout(() => (this.sucesso = false), 4000);
-    setTimeout(() => (this.avisoPosPedido = null), 8000);
+    this.vendaService
+      .criar({
+        status: 'ABERTO',
+        mesaId,
+        cliente: this.cliente.trim() || null,
+        itens: this.carrinho().map((item) => ({ produtoId: item.produto.id, quantidade: item.qtd })),
+      })
+      .subscribe({
+        next: (pedido) => {
+          this.enviando.set(false);
+          this.carrinho.set([]);
+          this.cliente = '';
+          this.mesaSelecionada.set(null);
+          this.sucesso.set(`Pedido #${pedido.id} enviado para a cozinha!`);
+          setTimeout(() => this.sucesso.set(null), 5000);
+        },
+        error: (erro) => {
+          this.enviando.set(false);
+          this.erro.set(
+            MensagemErroApiUtil.extrair(
+              erro,
+              'Não foi possível criar o pedido. Confira a mesa, o estoque dos ingredientes e tente novamente.',
+            ),
+          );
+        },
+      });
   }
 }

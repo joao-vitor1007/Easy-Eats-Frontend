@@ -1,43 +1,136 @@
 <div class="pagina">
   <header class="topo">
-    <h1>Ficha Técnica</h1>
-    <p>Insumos e custo de produção de cada produto do cardápio</p>
+    <div>
+      <h1>Ficha Técnica</h1>
+      <p>Ingredientes de cada produto. Eles são baixados do estoque quando o pedido entra em preparo.</p>
+    </div>
+    <div class="topo-acoes">
+      <button type="button" class="btn btn-secundario" (click)="carregar()" [disabled]="carregando()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+    </div>
   </header>
 
-  <div class="lista-produtos">
-    @for (produto of produtos; track produto.id) {
-      <section class="painel produto-card">
-        <button type="button" class="cabecalho-produto" (click)="alternarExpansao(produto)">
-          <span class="titulo">
-            <i class="bi" [ngClass]="produto.icone"></i>
-            {{ produto.nome }}
-          </span>
+  @if (erro()) {
+    <div class="alerta alerta-erro" role="alert">
+      <i class="bi bi-exclamation-circle"></i>
+      <span class="alerta-texto">{{ erro() }}</span>
+      <button type="button" class="alerta-fechar" (click)="erro.set(null)" aria-label="Fechar"><i class="bi bi-x-lg"></i></button>
+    </div>
+  }
 
-          <span class="direita">
-            <span class="badge neutro">Custo: R$ {{ custoTotal(produto) | number: '1.2-2' }}</span>
-            <i class="bi" [ngClass]="produto.expandido ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
-          </span>
-        </button>
+  <input
+    type="search"
+    class="input-padrao busca"
+    placeholder="Buscar produto..."
+    [ngModel]="busca()"
+    (ngModelChange)="busca.set($event)"
+  />
 
-        @if (produto.expandido) {
-          <div class="lista">
-            @for (insumo of produto.insumos; track insumo.nome) {
-              <div class="linha">
-                <div class="info">
-                  <strong>{{ insumo.nome }}</strong>
-                  <span>{{ insumo.quantidade }}</span>
-                </div>
-
-                <div class="direita">
-                  <span>R$ {{ insumo.custoUnitario | number: '1.2-2' }} / unid.</span>
-                </div>
-              </div>
-            }
-          </div>
-        }
-      </section>
-    } @empty {
-      <p class="vazio">Nenhum produto cadastrado.</p>
+  @if (carregando()) {
+    <app-carregando texto="Carregando fichas técnicas..."></app-carregando>
+  } @else {
+    @if (ingredientes().length === 0) {
+      <div class="alerta alerta-info">
+        <i class="bi bi-info-circle"></i>
+        <span class="alerta-texto">Nenhum ingrediente cadastrado. <a routerLink="/controle-estoque">Cadastre ingredientes</a> para montar as fichas.</span>
+      </div>
     }
-  </div>
+
+    <div class="lista-produtos">
+      @for (ficha of fichas(); track ficha.produto.id) {
+        <section class="painel produto-ficha">
+          <button
+            type="button"
+            class="cabecalho-produto"
+            (click)="alternarExpansao(ficha.produto)"
+            [attr.aria-expanded]="estaExpandido(ficha.produto)"
+          >
+            <span class="titulo">
+              <strong>{{ ficha.produto.nome }}</strong>
+              <small>{{ ficha.produto.categoria?.nome ?? 'Sem categoria' }} · {{ ficha.produto.preco | currency: 'BRL' }}</small>
+            </span>
+
+            <span class="direita">
+              @if (ficha.linhas.length === 0) {
+                <span class="badge aviso">Sem ficha</span>
+              } @else {
+                <span class="badge neutro">Custo {{ ficha.custo | currency: 'BRL' }}</span>
+                @if (ficha.margem !== null) {
+                  <span class="badge" [class.sucesso]="ficha.margem >= 50" [class.aviso]="ficha.margem >= 20 && ficha.margem < 50" [class.erro]="ficha.margem < 20">
+                    Margem {{ ficha.margem | number: '1.0-0' }}%
+                  </span>
+                }
+              }
+              <i class="bi" [class.bi-chevron-up]="estaExpandido(ficha.produto)" [class.bi-chevron-down]="!estaExpandido(ficha.produto)"></i>
+            </span>
+          </button>
+
+          @if (estaExpandido(ficha.produto)) {
+            <div class="corpo-ficha">
+              <div class="tabela-wrap">
+                <table class="tabela">
+                  <thead>
+                    <tr><th>Ingrediente</th><th class="num">Quantidade</th><th class="num">Custo</th><th class="acoes"></th></tr>
+                  </thead>
+                  <tbody>
+                    @for (linha of ficha.linhas; track linha.ingrediente.id) {
+                      <tr>
+                        <td>{{ linha.ingrediente.nome }}</td>
+                        <td class="num">{{ linha.quantidade | number: '1.0-3' }} {{ linha.ingrediente.unidadeMedida }}</td>
+                        <td class="num">{{ linha.custo | currency: 'BRL' }}</td>
+                        <td class="acoes">
+                          <div>
+                            <button type="button" class="btn-icone perigo" (click)="remover(ficha.produto, linha)" title="Remover" aria-label="Remover ingrediente">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="4" class="vazio">Nenhum ingrediente nesta ficha.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (ingredientesDisponiveis(ficha).length > 0) {
+                <form class="form-adicionar" (ngSubmit)="adicionar(ficha.produto)">
+                  <div class="campo">
+                    <label [for]="'ing-' + ficha.produto.id">Ingrediente</label>
+                    <select
+                      [id]="'ing-' + ficha.produto.id"
+                      [name]="'ing-' + ficha.produto.id"
+                      [(ngModel)]="novoIngrediente[ficha.produto.id].ingredienteId"
+                    >
+                      <option [ngValue]="null">Selecione...</option>
+                      @for (ingrediente of ingredientesDisponiveis(ficha); track ingrediente.id) {
+                        <option [ngValue]="ingrediente.id">{{ ingrediente.nome }} ({{ ingrediente.unidadeMedida }})</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="campo campo-qtd">
+                    <label [for]="'qtd-' + ficha.produto.id">Quantidade {{ unidadeSelecionada(ficha.produto.id) ? '(' + unidadeSelecionada(ficha.produto.id) + ')' : '' }}</label>
+                    <input
+                      [id]="'qtd-' + ficha.produto.id"
+                      [name]="'qtd-' + ficha.produto.id"
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      [(ngModel)]="novoIngrediente[ficha.produto.id].quantidade"
+                    />
+                  </div>
+                  <button type="submit" class="btn btn-primario" [disabled]="salvando()">
+                    <i class="bi bi-plus-lg"></i> Adicionar
+                  </button>
+                </form>
+              }
+            </div>
+          }
+        </section>
+      } @empty {
+        <p class="vazio">Nenhum produto encontrado.</p>
+      }
+    </div>
+  }
 </div>

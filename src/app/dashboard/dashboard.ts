@@ -1,123 +1,111 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { catchError, forkJoin, of } from 'rxjs';
+import { CarregandoComponent } from '../../components/carregando/carregando';
+import { Estoque, EstoqueService } from '../controle-estoque/estoque.service';
+import {
+  STATUS_PEDIDO_LABEL,
+  StatusPedido,
+  TODOS_STATUS_PEDIDO,
+  Venda,
+  VendaService,
+  filtrarPorPeriodo,
+} from '../novo-pedido/venda.service';
+import { MensagemErroApiUtil } from '../utils/mensagemErroApiUtil';
+import { PeriodoUtil } from '../utils/periodoUtil';
 
-interface StatCard {
-  icon: string;
-  cor: string;
-  valor: string;
-  label: string;
-  variacao: string;
-}
-
-interface StatusOperacional {
-  icon: string;
-  cor: string;
-  valor: number;
-  label: string;
-}
-
-interface FormaPagamento {
-  nome: string;
-  cor: string;
-  valor: number;
-}
-
-interface ProdutoRanking {
-  nome: string;
-  quantidade: number;
-}
-
-interface PontoSemana {
+interface PontoDia {
   dia: string;
   valor: number;
 }
 
-interface PontoHorario {
-  hora: string;
-  pedidos: number;
-}
+const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const LARGURA_GRAFICO = 700;
+const ALTURA_GRAFICO = 180;
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CurrencyPipe, RouterLink, CarregandoComponent],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss'],
 })
-export class DashboardComponent {
-  readonly statsPrincipais: StatCard[] = [
-    { icon: 'bi-cash-stack', cor: 'verde', valor: 'R$ 614,50', label: 'Vendas do Dia', variacao: '+12%' },
-    { icon: 'bi-cart-check', cor: 'azul', valor: '18', label: 'Pedidos Realizados', variacao: '+8%' },
-    { icon: 'bi-graph-up-arrow', cor: 'roxo', valor: 'R$ 34,14', label: 'Ticket Médio', variacao: '+5%' },
-    { icon: 'bi-fire', cor: 'laranja', valor: 'R$ 268,90', label: 'Lucro do Dia', variacao: '+15%' },
-  ];
+export class DashboardComponent implements OnInit {
+  private vendaService = inject(VendaService);
+  private estoqueService = inject(EstoqueService);
 
-  readonly statsOperacionais: StatusOperacional[] = [
-    { icon: 'bi-egg-fried', cor: 'laranja', valor: 3, label: 'Em Preparo' },
-    { icon: 'bi-check-circle', cor: 'verde', valor: 2, label: 'Prontos' },
-    { icon: 'bi-box-seam', cor: 'azul', valor: 13, label: 'Entregues' },
-    { icon: 'bi-exclamation-triangle', cor: 'vermelho', valor: 2, label: 'Estoque Crítico' },
-  ];
+  readonly statusLabel = STATUS_PEDIDO_LABEL;
 
-  readonly vendasSemana: PontoSemana[] = [
-    { dia: 'ter', valor: 950 },
-    { dia: 'qua', valor: 980 },
-    { dia: 'qui', valor: 860 },
-    { dia: 'sex', valor: 840 },
-    { dia: 'sab', valor: 430 },
-    { dia: 'dom', valor: 650 },
-    { dia: 'seg', valor: 900 },
-  ];
+  carregando = signal(true);
+  erro = signal<string | null>(null);
+  private pedidos = signal<Venda[]>([]);
+  alertas = signal<Estoque[]>([]);
 
-  readonly formasPagamento: FormaPagamento[] = [
-    { nome: 'PIX', cor: '#22c55e', valor: 310.0 },
-    { nome: 'Cartão', cor: '#f97316', valor: 220.5 },
-    { nome: 'Dinheiro', cor: '#3b82f6', valor: 74.0 },
-    { nome: 'Vale', cor: '#f59e0b', valor: 10.0 },
-  ];
+  private hoje = PeriodoUtil.paraIso(new Date());
+  private inicioSemana = PeriodoUtil.resolver('semana').inicio;
 
-  readonly produtosMaisVendidos: ProdutoRanking[] = [
-    { nome: 'Hambúrguer Clássico', quantidade: 24 },
-    { nome: 'X-Bacon', quantidade: 19 },
-    { nome: 'Coca-Cola', quantidade: 17 },
-    { nome: 'Batata Frita', quantidade: 15 },
-    { nome: 'Milk Shake', quantidade: 9 },
-  ];
+  pedidosHoje = computed(() => filtrarPorPeriodo(this.pedidos(), this.hoje, this.hoje));
+  pedidosSemana = computed(() => filtrarPorPeriodo(this.pedidos(), this.inicioSemana, this.hoje));
+  resumoHoje = computed(() => VendaService.resumir(this.pedidosHoje()));
 
-  readonly horarioMovimento: PontoHorario[] = [
-    { hora: '11h', pedidos: 4 },
-    { hora: '12h', pedidos: 9 },
-    { hora: '13h', pedidos: 7 },
-    { hora: '18h', pedidos: 8 },
-    { hora: '19h', pedidos: 14 },
-    { hora: '20h', pedidos: 11 },
-    { hora: '21h', pedidos: 5 },
-  ];
+  aguardando = computed(() => this.pedidos().filter((p) => p.status === 'ABERTO').length);
+  emPreparo = computed(() => this.pedidos().filter((p) => p.status === 'EM_PREPARO').length);
 
-  get totalFormasPagamento(): number {
-    return this.formasPagamento.reduce((soma, f) => soma + f.valor, 0);
-  }
+  /** Faturamento (pedidos finalizados) de cada um dos últimos 7 dias. */
+  vendasSemana = computed<PontoDia[]>(() => {
+    const pontos: PontoDia[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const data = new Date();
+      data.setDate(data.getDate() - i);
+      const iso = PeriodoUtil.paraIso(data);
+      const valor = filtrarPorPeriodo(this.pedidos(), iso, iso)
+        .filter((p) => p.status === 'FINALIZADO')
+        .reduce((soma, p) => soma + p.valorTotal, 0);
+      pontos.push({ dia: DIAS_SEMANA[data.getDay()], valor });
+    }
+    return pontos;
+  });
 
-  get maiorValorSemana(): number {
-    return Math.max(...this.vendasSemana.map((p) => p.valor));
-  }
+  porStatus = computed(() => {
+    const pedidos = this.pedidosSemana();
+    const total = Math.max(1, pedidos.length);
+    return TODOS_STATUS_PEDIDO.map((status: StatusPedido) => {
+      const quantidade = pedidos.filter((p) => p.status === status).length;
+      return { status, quantidade, percentual: (quantidade / total) * 100 };
+    });
+  });
 
-  get maiorPedidosHorario(): number {
-    return Math.max(...this.horarioMovimento.map((p) => p.pedidos));
-  }
+  produtosMaisVendidos = computed(() => {
+    const contagem = new Map<string, number>();
+    for (const pedido of this.pedidosSemana()) {
+      if (pedido.status === 'CANCELADO') continue;
+      for (const item of pedido.itens) {
+        contagem.set(item.produto.nome, (contagem.get(item.produto.nome) ?? 0) + item.quantidade);
+      }
+    }
+    return [...contagem.entries()]
+      .map(([nome, quantidade]) => ({ nome, quantidade }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 5);
+  });
 
-  /** Gera o "d" de um path SVG de área suavizada para o gráfico semanal. */
-  get areaPath(): string {
-    const largura = 700;
-    const altura = 180;
-    const passo = largura / (this.vendasSemana.length - 1);
-    const max = this.maiorValorSemana * 1.15;
+  horarioMovimento = computed(() => {
+    const porHora = new Map<number, number>();
+    for (const pedido of this.pedidosSemana()) {
+      if (!pedido.dataCriacao) continue;
+      const hora = new Date(pedido.dataCriacao).getHours();
+      porHora.set(hora, (porHora.get(hora) ?? 0) + 1);
+    }
+    const lista = [...porHora.entries()].sort((a, b) => a[0] - b[0]).map(([hora, pedidos]) => ({ hora: `${hora}h`, pedidos }));
+    const maior = Math.max(1, ...lista.map((p) => p.pedidos));
+    return lista.map((p) => ({ ...p, altura: (p.pedidos / maior) * 100 }));
+  });
 
-    const pontos = this.vendasSemana.map((p, i) => ({
-      x: i * passo,
-      y: altura - (p.valor / max) * altura,
-    }));
+  private maiorValorSemana = computed(() => Math.max(1, ...this.vendasSemana().map((p) => p.valor)) * 1.15);
 
+  areaPath = computed(() => {
+    const pontos = this.vendasSemana().map((p, i) => ({ x: this.pontoX(i), y: this.pontoY(p.valor) }));
     let d = `M ${pontos[0].x} ${pontos[0].y}`;
     for (let i = 0; i < pontos.length - 1; i++) {
       const atual = pontos[i];
@@ -125,21 +113,38 @@ export class DashboardComponent {
       const meioX = (atual.x + proximo.x) / 2;
       d += ` C ${meioX} ${atual.y}, ${meioX} ${proximo.y}, ${proximo.x} ${proximo.y}`;
     }
-
     return d;
+  });
+
+  areaFillPath = computed(() => `${this.areaPath()} L ${LARGURA_GRAFICO} ${ALTURA_GRAFICO} L 0 ${ALTURA_GRAFICO} Z`);
+
+  ngOnInit(): void {
+    this.carregar();
   }
 
-  get areaFillPath(): string {
-    return `${this.areaPath} L 700 180 L 0 180 Z`;
+  carregar(): void {
+    this.carregando.set(true);
+    forkJoin({
+      pedidos: this.vendaService.listar(),
+      alertas: this.estoqueService.listarAlertas().pipe(catchError(() => of([] as Estoque[]))),
+    }).subscribe({
+      next: ({ pedidos, alertas }) => {
+        this.pedidos.set(pedidos);
+        this.alertas.set(alertas);
+        this.carregando.set(false);
+      },
+      error: (erro) => {
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar os indicadores.'));
+        this.carregando.set(false);
+      },
+    });
   }
 
   pontoX(i: number): number {
-    return i * (700 / (this.vendasSemana.length - 1));
+    return i * (LARGURA_GRAFICO / 6);
   }
 
   pontoY(valor: number): number {
-    const max = this.maiorValorSemana * 1.15;
-    return 180 - (valor / max) * 180;
+    return ALTURA_GRAFICO - (valor / this.maiorValorSemana()) * ALTURA_GRAFICO;
   }
-
 }

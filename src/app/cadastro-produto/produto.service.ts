@@ -10,8 +10,10 @@ export interface Produto {
   nome: string;
   descricao: string | null;
   preco: number;
+  /** Não existe no backend; mantido por compatibilidade com componentes legados. */
   custo: number | null;
   flAtivo: boolean;
+  /** Não existe no backend; mantido por compatibilidade com componentes legados. */
   natureza: NaturezaProduto | null;
   categoria: { id: number; nome: string } | null;
 }
@@ -20,10 +22,7 @@ export interface ProdutoPayload {
   nome: string;
   descricao: string | null;
   preco: number;
-  custo: number | null;
-  flAtivo: boolean;
-  natureza: NaturezaProduto;
-  categoria: { id: number } | null;
+  categoriaId: number;
 }
 
 interface ApiProduto {
@@ -32,42 +31,47 @@ interface ApiProduto {
   descricao: string | null;
   flativo: string | null;
   categoriaId: number;
-  preco: number;
+  preco: number | null;
 }
 
 interface ApiCategoria {
   id: number;
   nome: string;
-  flativo: string | null;
 }
 
 const API_URL = `${environment.apiUrl}/produto`;
 const CATEGORIAS_URL = `${environment.apiUrl}/categorias`;
 
+/**
+ * Endpoints /produto do backend. O GET lista apenas produtos ativos (com o
+ * preço ativo); o PUT gera uma nova versão de preço; o DELETE é exclusão lógica.
+ */
 @Injectable({ providedIn: 'root' })
 export class ProdutoService {
   constructor(private http: HttpClient) {}
 
   listar(): Observable<Produto[]> {
     return forkJoin({
-      produtos: this.http.get<ApiProduto[]>(API_URL),
-      categorias: this.http.get<ApiCategoria[]>(CATEGORIAS_URL),
+      produtos: this.http.get<ApiProduto[] | null>(API_URL),
+      categorias: this.http.get<ApiCategoria[] | null>(CATEGORIAS_URL),
     }).pipe(
       map(({ produtos, categorias }) =>
-        produtos.map((produto) => this.mapearProduto(produto, categorias)),
+        (produtos ?? [])
+          .map((produto) => this.mapearProduto(produto, categorias ?? []))
+          .sort((a, b) => a.nome.localeCompare(b.nome)),
       ),
     );
   }
 
   criar(payload: ProdutoPayload): Observable<Produto> {
     return this.http
-      .post<ApiProduto>(API_URL, this.paraPayloadApi(payload))
+      .post<ApiProduto>(API_URL, this.paraApi(payload))
       .pipe(switchMap((produto) => this.buscarCategoriaEMapear(produto)));
   }
 
   atualizar(id: number, payload: ProdutoPayload): Observable<Produto> {
     return this.http
-      .put<ApiProduto>(`${API_URL}/${id}`, this.paraPayloadApi(payload))
+      .put<ApiProduto>(`${API_URL}/${id}`, this.paraApi(payload))
       .pipe(switchMap((produto) => this.buscarCategoriaEMapear(produto)));
   }
 
@@ -76,9 +80,9 @@ export class ProdutoService {
   }
 
   private buscarCategoriaEMapear(produto: ApiProduto): Observable<Produto> {
-    return this.http.get<ApiCategoria[]>(CATEGORIAS_URL).pipe(
-      map((categorias) => this.mapearProduto(produto, categorias)),
-    );
+    return this.http
+      .get<ApiCategoria[] | null>(CATEGORIAS_URL)
+      .pipe(map((categorias) => this.mapearProduto(produto, categorias ?? [])));
   }
 
   private mapearProduto(produto: ApiProduto, categorias: ApiCategoria[]): Produto {
@@ -90,18 +94,17 @@ export class ProdutoService {
       descricao: produto.descricao ?? null,
       preco: Number(produto.preco ?? 0),
       custo: null,
-      flAtivo: produto.flativo === 'S',
+      flAtivo: produto.flativo !== 'N',
       natureza: null,
       categoria: categoria ? { id: categoria.id, nome: categoria.nome } : null,
     };
   }
 
-  private paraPayloadApi(payload: ProdutoPayload) {
+  private paraApi(payload: ProdutoPayload) {
     return {
       nome: payload.nome,
       descricao: payload.descricao,
-      flativo: payload.flAtivo ? 'S' : 'N',
-      categoriaId: payload.categoria?.id ?? null,
+      categoriaId: payload.categoriaId,
       preco: payload.preco,
     };
   }

@@ -1,57 +1,98 @@
 <div class="pagina">
   <header class="topo">
-    <h1>Relatório de Estoque</h1>
-    <p>Visão geral do estoque, consumo e distribuição por categoria</p>
+    <div>
+      <h1>Relatório de Estoque</h1>
+      <p>Valor imobilizado e ingredientes que precisam de reposição</p>
+    </div>
+    <div class="topo-acoes">
+      <button type="button" class="btn btn-secundario" (click)="carregar()" [disabled]="carregando()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+      <a class="btn btn-primario" routerLink="/controle-estoque"><i class="bi bi-boxes"></i> Gerenciar estoque</a>
+    </div>
   </header>
 
-  <div class="grid-stats">
-    <div class="stat-card">
-      <div class="stat-label">Total de Itens</div>
-      <div class="stat-valor">{{ totalItens }}</div>
+  @if (erro()) {
+    <div class="alerta alerta-erro" role="alert">
+      <i class="bi bi-exclamation-circle"></i>
+      <span class="alerta-texto">{{ erro() }}</span>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Valor Total em Estoque</div>
-      <div class="stat-valor">{{ valorTotalEstoque | currency: 'BRL' }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Itens em Estado Crítico</div>
-      <div class="stat-valor alerta">{{ itensCriticos }}</div>
-    </div>
-  </div>
+  }
 
-  <div class="grid-duas-colunas">
-    <section class="painel">
-      <h3>Itens Mais Consumidos no Mês</h3>
-
-      <div class="lista">
-        @for (item of itensMaisConsumidos; track item.nome; let i = $index) {
-          <div class="linha">
-            <div class="info">
-              <strong>{{ i + 1 }}. {{ item.nome }}</strong>
-            </div>
-            <span class="badge neutro">{{ item.quantidade }} un.</span>
-          </div>
-        } @empty {
-          <p class="vazio">Nenhum item consumido registrado.</p>
-        }
+  @if (carregando()) {
+    <app-carregando texto="Carregando estoque..."></app-carregando>
+  } @else {
+    <div class="grid-stats">
+      <div class="stat-card">
+        <div class="stat-icon azul"><i class="bi bi-boxes"></i></div>
+        <div>
+          <div class="stat-valor">{{ itens().length }}</div>
+          <div class="stat-label">Ingredientes ativos</div>
+        </div>
       </div>
-    </section>
-
-    <section class="painel">
-      <h3>Estoque por Categoria</h3>
-
-      <div class="lista">
-        @for (categoria of estoquePorCategoria; track categoria.categoria) {
-          <div class="linha">
-            <div class="info">
-              <strong>{{ categoria.categoria }}</strong>
-            </div>
-            <span class="badge neutro">{{ categoria.quantidadeItens }} itens</span>
-          </div>
-        } @empty {
-          <p class="vazio">Nenhuma categoria cadastrada.</p>
-        }
+      <div class="stat-card">
+        <div class="stat-icon verde"><i class="bi bi-cash-stack"></i></div>
+        <div>
+          <div class="stat-valor">{{ valorTotal() | currency: 'BRL' }}</div>
+          <div class="stat-label">Valor total em estoque</div>
+        </div>
       </div>
-    </section>
-  </div>
+      <div class="stat-card">
+        <div class="stat-icon vermelho"><i class="bi bi-exclamation-triangle"></i></div>
+        <div>
+          <div class="stat-valor" [class.critico]="criticos().length > 0">{{ criticos().length }}</div>
+          <div class="stat-label">No mínimo ou abaixo</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon amarelo"><i class="bi bi-question-circle"></i></div>
+        <div>
+          <div class="stat-valor">{{ semEstoque() }}</div>
+          <div class="stat-label">Sem estoque cadastrado</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-duas-colunas">
+      <section class="painel">
+        <h3>Precisam de reposição</h3>
+        <div class="tabela-wrap">
+          <table class="tabela">
+            <thead>
+              <tr><th>Ingrediente</th><th class="num">Atual</th><th class="num">Mínimo</th><th class="num">Faltam</th></tr>
+            </thead>
+            <tbody>
+              @for (item of criticos(); track item.nome) {
+                <tr>
+                  <td>{{ item.nome }}</td>
+                  <td class="num">{{ item.atual | number: '1.0-3' }} {{ item.unidade }}</td>
+                  <td class="num">{{ item.minimo | number: '1.0-3' }}</td>
+                  <td class="num"><span class="badge erro">{{ item.faltam | number: '1.0-3' }} {{ item.unidade }}</span></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="4" class="vazio">Nenhum ingrediente precisa de reposição.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="painel">
+        <h3>Maior valor em estoque</h3>
+        <ul class="lista-valor">
+          @for (linha of maiorValor(); track linha.nome) {
+            <li>
+              <div class="lista-valor__topo">
+                <span>{{ linha.nome }}</span>
+                <strong>{{ linha.valor | currency: 'BRL' }}</strong>
+              </div>
+              <span class="barra-fundo"><span class="barra-preenchida" [style.width.%]="linha.percentual"></span></span>
+            </li>
+          } @empty {
+            <li class="vazio">Nenhum estoque cadastrado.</li>
+          }
+        </ul>
+      </section>
+    </div>
+  }
 </div>

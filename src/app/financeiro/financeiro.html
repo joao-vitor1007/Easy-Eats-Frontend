@@ -1,62 +1,103 @@
-<div class="page-container">
-
+<div class="pagina">
   <header class="topo">
-    <h1>Financeiro</h1>
-    <p>Visão geral do faturamento por período</p>
+    <div>
+      <h1>Financeiro</h1>
+      <p>Faturamento por período, calculado a partir dos pedidos finalizados</p>
+    </div>
+    <div class="topo-acoes">
+      <button type="button" class="btn btn-secundario" (click)="carregar()" [disabled]="carregando()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+    </div>
   </header>
 
-  <div class="filtros">
-    <button [class.ativo]="filtroSelecionado === 'hoje'" (click)="selecionarFiltro('hoje')">Hoje</button>
-    <button [class.ativo]="filtroSelecionado === 'semana'" (click)="selecionarFiltro('semana')">7 dias</button>
-    <button [class.ativo]="filtroSelecionado === 'mes'" (click)="selecionarFiltro('mes')">30 dias</button>
-    <button [class.ativo]="filtroSelecionado === 'periodo'" (click)="selecionarFiltro('periodo')">Período</button>
-  </div>
+  <app-filtro-periodo (periodoChange)="periodo.set($event)"></app-filtro-periodo>
 
-  @if (filtroSelecionado === 'periodo') {
-    <div class="form-periodo">
-      <div class="form-linha">
-        <label>De</label>
-        <input type="date" [(ngModel)]="dataInicioCustom" />
-      </div>
-      <div class="form-linha">
-        <label>Até</label>
-        <input type="date" [(ngModel)]="dataFimCustom" />
-      </div>
-      <button type="button" class="btn-primario" (click)="carregar()">Aplicar</button>
+  @if (erro()) {
+    <div class="alerta alerta-erro" role="alert">
+      <i class="bi bi-exclamation-circle"></i>
+      <span class="alerta-texto">{{ erro() }}</span>
     </div>
   }
 
-  @if (erro) {
-    <p class="vazio">{{ erro }}</p>
-  } @else if (carregando) {
-    <p class="vazio">Carregando...</p>
-  } @else if (relatorio) {
-    <div class="summary-grid">
-      <div class="summary-card">
-        <div class="valor text-success">R$ {{ relatorio.totalFaturado.toFixed(2) }}</div>
-        <div class="paragrafo">Faturamento</div>
+  @if (carregando()) {
+    <app-carregando texto="Carregando faturamento..."></app-carregando>
+  } @else {
+    <div class="grid-stats">
+      <div class="stat-card">
+        <div class="stat-icon verde"><i class="bi bi-cash-stack"></i></div>
+        <div>
+          <div class="stat-valor">{{ relatorio().totalFaturado | currency: 'BRL' }}</div>
+          <div class="stat-label">Faturamento</div>
+        </div>
       </div>
-
-      <div class="summary-card">
-        <div class="valor">R$ {{ relatorio.ticketMedio.toFixed(2) }}</div>
-        <div class="paragrafo">Ticket médio</div>
+      <div class="stat-card">
+        <div class="stat-icon roxo"><i class="bi bi-graph-up-arrow"></i></div>
+        <div>
+          <div class="stat-valor">{{ relatorio().ticketMedio | currency: 'BRL' }}</div>
+          <div class="stat-label">Ticket médio</div>
+        </div>
       </div>
-
-      <div class="summary-card">
-        <div class="valor">{{ relatorio.quantidadeVendas }}</div>
-        <div class="paragrafo">Vendas no período</div>
+      <div class="stat-card">
+        <div class="stat-icon azul"><i class="bi bi-receipt"></i></div>
+        <div>
+          <div class="stat-valor">{{ relatorio().quantidadeVendas }}</div>
+          <div class="stat-label">Vendas finalizadas</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon laranja"><i class="bi bi-hourglass-split"></i></div>
+        <div>
+          <div class="stat-valor">{{ emAberto() | currency: 'BRL' }}</div>
+          <div class="stat-label">Em aberto (não finalizado)</div>
+        </div>
       </div>
     </div>
 
-    @if (relatorio.quantidadeVendas === 0) {
-      <p class="vazio">Nenhuma venda encontrada nesse período.</p>
-    }
+    <div class="grid-duas-colunas">
+      <section class="painel">
+        <h3>Faturamento por dia</h3>
+        <div class="tabela-wrap">
+          <table class="tabela">
+            <thead>
+              <tr><th>Dia</th><th class="num">Vendas</th><th class="num">Valor</th></tr>
+            </thead>
+            <tbody>
+              @for (linha of porDia(); track linha.dia) {
+                <tr>
+                  <td>{{ dataDoDia(linha.dia) | date: 'EEE, dd/MM/yyyy' }}</td>
+                  <td class="num">{{ linha.quantidade }}</td>
+                  <td class="num"><strong>{{ linha.valor | currency: 'BRL' }}</strong></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="3" class="vazio">Nenhuma venda finalizada nesse período.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="painel">
+        <h3>Vendas finalizadas</h3>
+        <div class="tabela-wrap tabela-rolavel">
+          <table class="tabela">
+            <thead>
+              <tr><th>Pedido</th><th>Data</th><th class="num">Valor</th></tr>
+            </thead>
+            <tbody>
+              @for (pedido of finalizados(); track pedido.id) {
+                <tr>
+                  <td>#{{ pedido.id }} · {{ identificacao(pedido) }}</td>
+                  <td>{{ pedido.dataCriacao ? (pedido.dataCriacao | date: 'dd/MM HH:mm') : '—' }}</td>
+                  <td class="num">{{ pedido.valorTotal | currency: 'BRL' }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="3" class="vazio">Nenhuma venda finalizada nesse período.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   }
-
-  <p class="nota">
-    Os valores consideram vendas de balcão/retirada e de mesa (via comanda). Detalhamento de
-    entradas e saídas manuais fica em
-    <a routerLink="/gestao-financeira">Gestão Financeira</a>.
-  </p>
-
 </div>

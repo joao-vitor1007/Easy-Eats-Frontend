@@ -31,7 +31,7 @@
         <div class="stat-label">Taxa de Inadimplência</div>
         <span class="variacao negativa">{{ variacaoInadimplencia }}</span>
       </div>
-      <div class="stat-valor" [class.alerta]="taxaInadimplencia > 5">{{ taxaInadimplencia }}%</div>
+      <div class="stat-valor" [class.critico]="taxaInadimplencia > 5">{{ taxaInadimplencia }}%</div>
     </div>
   </div>
 

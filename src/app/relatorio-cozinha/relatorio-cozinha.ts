@@ -1,47 +1,106 @@
-import { Component } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { CarregandoComponent } from '../../components/carregando/carregando';
+import { FiltroPeriodoComponent } from '../../components/filtro-periodo/filtro-periodo';
+import { Venda, VendaService, filtrarPorPeriodo } from '../novo-pedido/venda.service';
+import { MensagemErroApiUtil } from '../utils/mensagemErroApiUtil';
+import { Periodo, PeriodoUtil } from '../utils/periodoUtil';
 
-interface ItemPreparado {
-  nome: string;
-  quantidade: number;
-}
-
-interface TempoHorario {
-  hora: string;
-  minutos: number;
-}
+/** Pedidos em andamento há mais tempo que isso contam como atrasados. */
+const MINUTOS_ATRASO = 20;
 
 @Component({
   selector: 'app-relatorio-cozinha',
   standalone: true,
+  imports: [DecimalPipe, CarregandoComponent, FiltroPeriodoComponent],
   templateUrl: './relatorio-cozinha.html',
   styleUrl: './relatorio-cozinha.scss',
 })
-export class RelatorioCozinha {
-  readonly pedidosPreparadosHoje = 42;
-  readonly tempoMedioPreparo = 14.5;
-  readonly pedidosAtrasados = 2;
+export class RelatorioCozinha implements OnInit {
+  private vendaService = inject(VendaService);
 
-  readonly itensMaisPreparados: ItemPreparado[] = [
-    { nome: 'Hambúrguer Clássico', quantidade: 24 },
-    { nome: 'X-Bacon', quantidade: 19 },
-    { nome: 'Batata Frita', quantidade: 15 },
-    { nome: 'Hot Dog', quantidade: 9 },
-  ];
+  readonly minutosAtraso = MINUTOS_ATRASO;
 
-  readonly tempoPorHorario: TempoHorario[] = [
-    { hora: '11h', minutos: 11 },
-    { hora: '12h', minutos: 16 },
-    { hora: '13h', minutos: 18 },
-    { hora: '18h', minutos: 13 },
-    { hora: '19h', minutos: 17 },
-    { hora: '20h', minutos: 15 },
-  ];
+  carregando = signal(true);
+  erro = signal<string | null>(null);
+  private todos = signal<Venda[]>([]);
+  periodo = signal<Periodo>(PeriodoUtil.resolver('hoje'));
 
-  get maiorTempo(): number {
-    return Math.max(...this.tempoPorHorario.map((t) => t.minutos));
+  private pedidos = computed(() => filtrarPorPeriodo(this.todos(), this.periodo().inicio, this.periodo().fim));
+  private finalizados = computed(() => this.pedidos().filter((p) => p.status === 'FINALIZADO'));
+
+  preparados = computed(() => this.finalizados().length);
+
+  /**
+   * O backend não registra o horário de cada etapa: usamos a diferença entre
+   * a criação do pedido e a última alteração (quando foi finalizado).
+   */
+  tempoMedio = computed(() => this.media(this.finalizados().map((p) => this.minutosAtendimento(p))));
+
+  atrasados = computed(() => {
+    const agora = Date.now();
+    return this.todos().filter(
+      (p) =>
+        (p.status === 'ABERTO' || p.status === 'EM_PREPARO') &&
+        !!p.dataCriacao &&
+        (agora - new Date(p.dataCriacao).getTime()) / 60000 >= MINUTOS_ATRASO,
+    ).length;
+  });
+
+  tempoPorHorario = computed(() => {
+    const grupos = new Map<number, number[]>();
+    for (const pedido of this.finalizados()) {
+      const minutos = this.minutosAtendimento(pedido);
+      if (minutos === null || !pedido.dataCriacao) continue;
+      const hora = new Date(pedido.dataCriacao).getHours();
+      grupos.set(hora, [...(grupos.get(hora) ?? []), minutos]);
+    }
+    const linhas = [...grupos.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([hora, tempos]) => ({ hora: `${hora}h`, minutos: this.media(tempos) ?? 0 }));
+    const maior = Math.max(1, ...linhas.map((l) => l.minutos));
+    return linhas.map((l) => ({ ...l, altura: (l.minutos / maior) * 100 }));
+  });
+
+  itensMaisPreparados = computed(() => {
+    const contagem = new Map<string, number>();
+    for (const pedido of this.finalizados()) {
+      for (const item of pedido.itens) {
+        contagem.set(item.produto.nome, (contagem.get(item.produto.nome) ?? 0) + item.quantidade);
+      }
+    }
+    return [...contagem.entries()]
+      .map(([nome, quantidade]) => ({ nome, quantidade }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 8);
+  });
+
+  ngOnInit(): void {
+    this.carregar();
   }
 
-  get maiorQuantidadeItem(): number {
-    return Math.max(...this.itensMaisPreparados.map((i) => i.quantidade));
+  carregar(): void {
+    this.carregando.set(true);
+    this.vendaService.listar().subscribe({
+      next: (pedidos) => {
+        this.todos.set(pedidos);
+        this.carregando.set(false);
+      },
+      error: (erro) => {
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar os pedidos.'));
+        this.carregando.set(false);
+      },
+    });
+  }
+
+  private minutosAtendimento(pedido: Venda): number | null {
+    if (!pedido.dataCriacao || !pedido.dataAlteracao) return null;
+    const minutos = (new Date(pedido.dataAlteracao).getTime() - new Date(pedido.dataCriacao).getTime()) / 60000;
+    return minutos >= 0 ? minutos : null;
+  }
+
+  private media(valores: (number | null)[]): number | null {
+    const validos = valores.filter((v): v is number => v !== null);
+    return validos.length ? validos.reduce((s, v) => s + v, 0) / validos.length : null;
   }
 }

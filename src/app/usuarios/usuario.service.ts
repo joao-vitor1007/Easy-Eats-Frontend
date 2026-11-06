@@ -1,80 +1,54 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable, map, switchMap } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Perfil } from '../auth/auth.service';
+import { Perfil, ROLE_BACKEND, perfilDasRoles } from '../auth/auth.service';
 
 export interface Usuario {
-  id: number;
-  nome: string;
-  email: string;
-  role: Perfil;
-  flAtivo: boolean | null;
+  username: string;
+  roles: string[];
+  perfil: Perfil;
 }
 
 export interface UsuarioPayload {
-  nome: string;
-  email: string;
+  username: string;
   senha: string;
-  role: Perfil;
-  flAtivo: boolean;
+  perfil: Perfil;
 }
 
 interface ApiUsuario {
   username: string;
-  roles: string[];
+  roles: string[] | null;
 }
 
 const API_URL = `${environment.apiUrl}/usuarios`;
 
+/** Endpoints /usuarios do backend (UsuarioDTO: username, password, roles). */
 @Injectable({ providedIn: 'root' })
 export class UsuarioService {
   constructor(private http: HttpClient) {}
 
   listar(): Observable<Usuario[]> {
-    return this.http.get<ApiUsuario[]>(API_URL).pipe(
-      map((usuarios) => usuarios.map((usuario) => this.mapear(usuario))),
-    );
-  }
-
-  criar(usuario: UsuarioPayload): Observable<Usuario> {
-    const role = usuario.role === 'SUPERADMIN' || usuario.role === 'ADMINISTRADOR'
-      ? 'ADMIN'
-      : 'USER';
-
-    return this.http.post<void>(API_URL, {
-      username: usuario.email || usuario.nome,
-      password: usuario.senha,
-      roles: [role],
-    }).pipe(
-      switchMap(() =>
-        this.http.get<ApiUsuario[]>(API_URL).pipe(
-          map((usuarios) => {
-            const criado = usuarios.find((item) => item.username === (usuario.email || usuario.nome));
-            return criado
-              ? this.mapear(criado)
-              : {
-                  id: 0,
-                  nome: usuario.nome,
-                  email: usuario.email,
-                  role: usuario.role,
-                  flAtivo: true,
-                };
-          }),
-        ),
+    return this.http.get<ApiUsuario[] | null>(API_URL).pipe(
+      map((usuarios) =>
+        (usuarios ?? [])
+          .map((usuario) => this.mapear(usuario))
+          .sort((a, b) => a.username.localeCompare(b.username)),
       ),
     );
   }
 
-  private mapear(usuario: ApiUsuario): Usuario {
-    const administrador = (usuario.roles ?? []).some((role) => role.toUpperCase().includes('ADMIN'));
+  /** POST /usuarios responde 201 sem corpo. */
+  criar(usuario: UsuarioPayload): Observable<Usuario> {
+    const roles = [ROLE_BACKEND[usuario.perfil]];
 
-    return {
-      id: 0,
-      nome: usuario.username,
-      email: usuario.username,
-      role: administrador ? 'ADMINISTRADOR' : 'OPERADOR',
-      flAtivo: true,
-    };
+    return this.http
+      .post<void>(API_URL, { username: usuario.username, password: usuario.senha, roles })
+      .pipe(map(() => this.mapear({ username: usuario.username, roles })));
+  }
+
+  private mapear(usuario: ApiUsuario): Usuario {
+    const roles = usuario.roles ?? [];
+    return { username: usuario.username, roles, perfil: perfilDasRoles(roles) };
   }
 }

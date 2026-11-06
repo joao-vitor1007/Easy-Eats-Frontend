@@ -1,47 +1,64 @@
 <div class="pagina">
   <header class="topo">
-    <h1>Novo Pedido</h1>
-    <p>Monte o pedido selecionando uma mesa e os produtos desejados.</p>
+    <div>
+      <h1>Novo Pedido</h1>
+      <p>Selecione a mesa e os produtos. O preço é calculado pela API a partir do preço ativo de cada produto.</p>
+    </div>
   </header>
 
-  @if (sucesso) {
-    <div class="alerta-sucesso">
-      <i class="bi bi-check-circle"></i> Pedido enviado para a cozinha!
+  @if (sucesso()) {
+    <div class="alerta alerta-sucesso" role="status">
+      <i class="bi bi-check-circle"></i>
+      <span class="alerta-texto">{{ sucesso() }} <a routerLink="/tela-cozinha">Ver na cozinha</a></span>
     </div>
   }
 
-  @if (erro) {
-    <div class="alerta-erro">{{ erro }}</div>
+  @if (erro()) {
+    <div class="alerta alerta-erro" role="alert">
+      <i class="bi bi-exclamation-circle"></i>
+      <span class="alerta-texto">{{ erro() }}</span>
+      <button type="button" class="alerta-fechar" (click)="erro.set(null)" aria-label="Fechar"><i class="bi bi-x-lg"></i></button>
+    </div>
   }
 
-  @if (avisoPosPedido) {
-    <div class="alerta-aviso">{{ avisoPosPedido }}</div>
-  }
-
-  @if (carregando) {
-    <app-carregando texto="Carregando produtos..."></app-carregando>
+  @if (carregando()) {
+    <app-carregando texto="Carregando produtos e mesas..."></app-carregando>
   } @else {
     <div class="wrapper">
       <div class="conteudo">
-        <div class="dados-pedido">
-          <select class="input-busca" [(ngModel)]="mesaSelecionada">
-            <option [ngValue]="null">Selecione a mesa...</option>
-            @for (mesa of mesas; track mesa.id) {
-              <option [ngValue]="mesa.id">Mesa {{ mesa.numero }}</option>
+        <div class="painel dados-pedido">
+          <div class="campo">
+            <label for="mesa">Mesa *</label>
+            <select id="mesa" [ngModel]="mesaSelecionada()" (ngModelChange)="mesaSelecionada.set($event)">
+              <option [ngValue]="null">Selecione a mesa...</option>
+              @for (mesa of mesas(); track mesa.id) {
+                <option [ngValue]="mesa.id">Mesa {{ mesa.numero }}</option>
+              }
+            </select>
+            @if (mesas().length === 0) {
+              <small class="erro-campo">Nenhuma mesa cadastrada. Cadastre em <a routerLink="/mesas">Mesas</a>.</small>
             }
-          </select>
+          </div>
 
+          <div class="campo">
+            <label for="cliente">Cliente</label>
+            <input id="cliente" type="text" placeholder="Nome do cliente (opcional)" [(ngModel)]="cliente" />
+          </div>
+        </div>
+
+        <div class="barra-produtos">
           <input
-            type="text"
-            placeholder="Nome do cliente (opcional)"
-            [(ngModel)]="cliente"
-            class="input-busca"
+            type="search"
+            class="input-padrao"
+            placeholder="Buscar produto..."
+            [ngModel]="busca()"
+            (ngModelChange)="busca.set($event)"
           />
         </div>
 
         <div class="filtros">
-          @for (cat of categorias; track cat) {
-            <button [class.ativo]="categoriaSelecionada === cat" (click)="selecionarCategoria(cat)">
+          @for (cat of categorias(); track cat) {
+            <button type="button" [class.ativo]="categoriaSelecionada() === cat" (click)="categoriaSelecionada.set(cat)">
               {{ cat }}
             </button>
           }
@@ -49,70 +66,85 @@
 
         <div class="produtos">
           @for (produto of produtosFiltrados(); track produto.id) {
-            <div class="card produto-card" (click)="adicionarAoCarrinho(produto)">
-              <div class="icone-produto">
-                <i class="bi" [ngClass]="iconeCategoria(produto.categoria?.nome)"></i>
-              </div>
-              <div class="info">
-                <h4>{{ produto.nome }}</h4>
-                <span class="preco-destaque">R$ {{ produto.preco.toFixed(2) }}</span>
-              </div>
-              <button
-                type="button"
-                class="adicionar-produto"
-                (click)="adicionarAoCarrinho(produto); $event.stopPropagation()"
-              >
-                Adicionar
-              </button>
-            </div>
+            <button
+              type="button"
+              class="produto-card"
+              [class.selecionado]="quantidadeNoCarrinho(produto) > 0"
+              [disabled]="semPreco(produto)"
+              (click)="adicionarAoCarrinho(produto)"
+              [title]="semPreco(produto) ? 'Produto sem preço ativo' : 'Adicionar ao pedido'"
+            >
+              <span class="icone-produto">
+                <i class="bi" [class]="iconeCategoria(produto.categoria?.nome)"></i>
+              </span>
+              <span class="produto-info">
+                <strong>{{ produto.nome }}</strong>
+                @if (semPreco(produto)) {
+                  <span class="produto-sem-preco">Sem preço</span>
+                } @else {
+                  <span class="preco-destaque">{{ produto.preco | currency: 'BRL' }}</span>
+                }
+              </span>
+              @if (quantidadeNoCarrinho(produto) > 0) {
+                <span class="produto-qtd">{{ quantidadeNoCarrinho(produto) }}</span>
+              } @else {
+                <span class="produto-add"><i class="bi bi-plus-lg"></i></span>
+              }
+            </button>
           } @empty {
-            <p class="vazio">Nenhum produto cadastrado ainda.</p>
+            <p class="vazio">
+              {{ produtos().length === 0 ? 'Nenhum produto cadastrado ainda.' : 'Nenhum produto encontrado com esse filtro.' }}
+            </p>
           }
         </div>
       </div>
 
-      @if (carrinho.length > 0) {
-        <div class="carrinho">
-          <h3><i class="bi bi-cart3"></i> Carrinho ({{ carrinho.length }})</h3>
-
-          @for (item of carrinho; track item.id; let i = $index) {
-            <div class="item">
-              <div class="left">
-                <span class="icone-produto icone-produto--sm">
-                  <i class="bi" [ngClass]="iconeCategoria(item.produto.categoria?.nome)"></i>
-                </span>
-                <div class="item-info">
-                  <span class="nome">{{ item.produto.nome }}</span>
-                </div>
-              </div>
-
-              <div class="right">
-                <div class="qtd">
-                  <button type="button" (click)="diminuirQtd(i)">−</button>
-                  <span>{{ item.qtd }}</span>
-                  <button type="button" (click)="aumentarQtd(i)">+</button>
-                </div>
-                <span class="preco">R$ {{ (precoUnitario(item) * item.qtd).toFixed(2) }}</span>
-              </div>
-            </div>
+      <aside class="carrinho painel">
+        <div class="painel-cabecalho">
+          <h3><i class="bi bi-cart3"></i> Carrinho ({{ quantidadeItens() }})</h3>
+          @if (carrinho().length > 0) {
+            <button type="button" class="btn btn-secundario btn-sm" (click)="limparCarrinho()">Limpar</button>
           }
-
-          <hr />
-
-          <div class="total">
-            <span>Total</span>
-            <strong>R$ {{ total().toFixed(2) }}</strong>
-          </div>
-
-          @if (!podeFinalizar()) {
-            <small class="aviso-finalizar">Selecione uma mesa para finalizar.</small>
-          }
-
-          <button class="finalizar" [disabled]="!podeFinalizar() || enviando" (click)="confirmarPedido()">
-            {{ enviando ? 'Enviando...' : 'Finalizar Pedido' }}
-          </button>
         </div>
-      }
+
+        <div class="itens-carrinho">
+          @for (item of carrinho(); track item.produto.id) {
+            <div class="item-carrinho">
+              <div class="item-carrinho__info">
+                <strong>{{ item.produto.nome }}</strong>
+                <span>{{ item.produto.preco | currency: 'BRL' }} cada</span>
+              </div>
+
+              <div class="qtd">
+                <button type="button" (click)="alterarQtd(item, -1)" aria-label="Diminuir quantidade">−</button>
+                <span>{{ item.qtd }}</span>
+                <button type="button" (click)="alterarQtd(item, 1)" aria-label="Aumentar quantidade">+</button>
+              </div>
+
+              <span class="item-carrinho__total">{{ item.produto.preco * item.qtd | currency: 'BRL' }}</span>
+
+              <button type="button" class="btn-icone perigo" (click)="remover(item)" title="Remover" aria-label="Remover item">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          } @empty {
+            <p class="vazio">Toque em um produto para adicioná-lo.</p>
+          }
+        </div>
+
+        <div class="total">
+          <span>Total</span>
+          <strong>{{ total() | currency: 'BRL' }}</strong>
+        </div>
+
+        @if (carrinho().length > 0 && mesaSelecionada() === null) {
+          <small class="aviso-finalizar"><i class="bi bi-info-circle"></i> Selecione uma mesa para finalizar.</small>
+        }
+
+        <button type="button" class="btn btn-primario btn-bloco" [disabled]="!podeFinalizar()" (click)="confirmarPedido()">
+          {{ enviando() ? 'Enviando...' : 'Finalizar pedido' }}
+        </button>
+      </aside>
     </div>
   }
 </div>

@@ -1,47 +1,45 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Categoria, CategoriaService } from './categoria.service';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { CarregandoComponent } from '../../components/carregando/carregando';
 import { MensagemErroApiUtil } from '../utils/mensagemErroApiUtil';
+import { Categoria, CategoriaService } from './categoria.service';
 
 @Component({
   selector: 'app-categorias',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule, CarregandoComponent],
   templateUrl: './categorias.html',
   styleUrl: './categorias.scss',
 })
 export class Categorias implements OnInit {
-  private fb = new FormBuilder();
+  private categoriaService = inject(CategoriaService);
 
-  categorias: Categoria[] = [];
-  carregando = true;
-  salvando = false;
-  erro: string | null = null;
-  editandoId: number | null = null;
+  categorias = signal<Categoria[]>([]);
+  carregando = signal(true);
+  salvando = signal(false);
+  erro = signal<string | null>(null);
+  sucesso = signal<string | null>(null);
+  editando = signal<Categoria | null>(null);
 
-  form = this.fb.group({
-    nome: ['', Validators.required],
-    descricao: [''],
-    flativo: [true],
+  form = new FormGroup({
+    nome: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    ativa: new FormControl(true, { nonNullable: true }),
   });
-
-  constructor(private categoriaService: CategoriaService) {}
 
   ngOnInit() {
     this.carregar();
   }
 
   carregar() {
-    this.carregando = true;
+    this.carregando.set(true);
     this.categoriaService.listar().subscribe({
       next: (categorias) => {
-        this.categorias = categorias;
-        this.carregando = false;
+        this.categorias.set(categorias);
+        this.carregando.set(false);
       },
       error: (erro) => {
-        this.erro = MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar as categorias.');
-        this.carregando = false;
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar as categorias.'));
+        this.carregando.set(false);
       },
     });
   }
@@ -52,58 +50,61 @@ export class Categorias implements OnInit {
       return;
     }
 
-    const { nome, descricao, flativo } = this.form.value;
-    const payload = { nome: nome!, descricao: descricao || null, flativo: flativo ?? true };
+    const { nome, ativa } = this.form.getRawValue();
+    const payload = { nome: nome.trim(), ativa };
+    const editando = this.editando();
 
-    this.salvando = true;
-    this.erro = null;
+    this.salvando.set(true);
+    this.erro.set(null);
 
-    const requisicao =
-      this.editandoId !== null
-        ? this.categoriaService.atualizar(this.editandoId, payload)
-        : this.categoriaService.criar(payload);
+    const requisicao = editando
+      ? this.categoriaService.atualizar(editando.id, payload)
+      : this.categoriaService.criar(payload);
 
     requisicao.subscribe({
       next: () => {
-        this.salvando = false;
-        this.editandoId = null;
-        this.form.reset({ flativo: true });
+        this.salvando.set(false);
+        this.mostrarSucesso(editando ? `Categoria "${payload.nome}" atualizada.` : `Categoria "${payload.nome}" criada.`);
+        this.cancelarEdicao();
         this.carregar();
       },
       error: (erro) => {
-        this.erro = MensagemErroApiUtil.extrair(erro, 'Não foi possível salvar a categoria.');
-        this.salvando = false;
+        this.salvando.set(false);
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível salvar a categoria.'));
       },
     });
   }
 
   editar(categoria: Categoria) {
-    this.editandoId = categoria.id;
-    this.form.setValue({
-      nome: categoria.nome,
-      descricao: categoria.descricao ?? '',
-      flativo: categoria.flativo ?? true,
-    });
+    this.editando.set(categoria);
+    this.form.setValue({ nome: categoria.nome, ativa: categoria.ativa });
   }
 
   cancelarEdicao() {
-    this.editandoId = null;
-    this.form.reset({ flativo: true });
+    this.editando.set(null);
+    this.form.reset({ nome: '', ativa: true });
   }
 
-  excluir(categoria: Categoria) {
-    if (!confirm(`Excluir a categoria "${categoria.nome}"?`)) {
+  alternarAtiva(categoria: Categoria) {
+    const requisicao = categoria.ativa
+      ? this.categoriaService.inativar(categoria.id)
+      : this.categoriaService.atualizar(categoria.id, { nome: categoria.nome, ativa: true });
+
+    if (categoria.ativa && !confirm(`Inativar a categoria "${categoria.nome}"?`)) {
       return;
     }
 
-    this.categoriaService.excluir(categoria.id).subscribe({
-      next: () => this.carregar(),
-      error: (erro) => {
-        this.erro = MensagemErroApiUtil.extrair(
-          erro,
-          'Não foi possível excluir a categoria. Verifique se ainda há produtos vinculados a ela.',
-        );
+    requisicao.subscribe({
+      next: (atualizada) => {
+        this.categorias.update((lista) => lista.map((c) => (c.id === atualizada.id ? atualizada : c)));
+        this.mostrarSucesso(`Categoria "${categoria.nome}" ${atualizada.ativa ? 'reativada' : 'inativada'}.`);
       },
+      error: (erro) => this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível alterar a categoria.')),
     });
+  }
+
+  private mostrarSucesso(mensagem: string) {
+    this.sucesso.set(mensagem);
+    setTimeout(() => this.sucesso.set(null), 4000);
   }
 }

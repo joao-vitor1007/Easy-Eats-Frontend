@@ -18,15 +18,21 @@
 
   <section class="painel-form">
     <div class="auth-card">
-      @if (!modoRecuperarSenha) {
+      @if (!modoRecuperarSenha()) {
         <div class="cabecalho-form">
           <h2>Bem-vindo de volta</h2>
           <p>Entre com sua conta para continuar</p>
         </div>
 
-        @if (erro) {
-          <div class="alerta-erro">
-            <i class="bi bi-exclamation-circle"></i> {{ erro }}
+        @if (aviso()) {
+          <div class="alerta alerta-aviso">
+            <i class="bi bi-clock-history"></i> <span class="alerta-texto">{{ aviso() }}</span>
+          </div>
+        }
+
+        @if (erro()) {
+          <div class="alerta alerta-erro" role="alert">
+            <i class="bi bi-exclamation-circle"></i> <span class="alerta-texto">{{ erro() }}</span>
           </div>
         }
 
@@ -37,7 +43,7 @@
               #campoEmailLogin
               type="text"
               icone="bi-person"
-              placeholder="seu usuário ou email"
+              placeholder="seu usuário"
               autocomplete="username"
               formControlName="email"
             ></app-campo-texto>
@@ -64,8 +70,8 @@
             </small>
           </div>
 
-          <button type="submit" class="btn-entrar" [disabled]="enviando">
-            {{ enviando ? 'Entrando...' : 'Entrar' }} <i class="bi bi-arrow-right"></i>
+          <button type="submit" class="btn-entrar" [disabled]="enviando()">
+            {{ enviando() ? 'Entrando...' : 'Entrar' }} <i class="bi bi-arrow-right"></i>
           </button>
         </form>
       } @else {

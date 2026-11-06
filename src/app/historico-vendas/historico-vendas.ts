@@ -1,78 +1,120 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { CurrencyPipe, DatePipe } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { STATUS_PEDIDO, Venda, VendaService } from '../novo-pedido/venda.service';
+import { CarregandoComponent } from '../../components/carregando/carregando';
+import {
+  PROXIMO_STATUS,
+  STATUS_PEDIDO_LABEL,
+  StatusPedido,
+  TODOS_STATUS_PEDIDO,
+  Venda,
+  VendaService,
+  identificacaoPedido,
+} from '../novo-pedido/venda.service';
 import { MensagemErroApiUtil } from '../utils/mensagemErroApiUtil';
+
+type FiltroStatus = 'TODOS' | StatusPedido;
 
 @Component({
   selector: 'app-historico-vendas',
   standalone: true,
   templateUrl: './historico-vendas.html',
   styleUrls: ['./historico-vendas.scss'],
-  imports: [CommonModule, FormsModule],
+  imports: [CurrencyPipe, DatePipe, FormsModule, CarregandoComponent],
 })
 export class HistoricoVendasComponent implements OnInit {
-  busca = '';
-  carregando = true;
-  erro: string | null = null;
+  private vendaService = inject(VendaService);
 
-  vendas: Venda[] = [];
+  readonly statusLabel = STATUS_PEDIDO_LABEL;
+  readonly filtros: { valor: FiltroStatus; label: string }[] = [
+    { valor: 'TODOS', label: 'Todos' },
+    ...TODOS_STATUS_PEDIDO.map((status) => ({ valor: status as FiltroStatus, label: STATUS_PEDIDO_LABEL[status] })),
+  ];
+  readonly identificacao = identificacaoPedido;
 
-  filtros = ['Todos', STATUS_PEDIDO.AGUARDANDO, STATUS_PEDIDO.PREPARANDO, STATUS_PEDIDO.PRONTO, STATUS_PEDIDO.ENTREGUE];
-  filtroSelecionado = 'Todos';
+  busca = signal('');
+  filtroSelecionado = signal<FiltroStatus>('TODOS');
+  carregando = signal(true);
+  erro = signal<string | null>(null);
+  processandoId = signal<number | null>(null);
+  vendas = signal<Venda[]>([]);
 
-  constructor(private vendaService: VendaService) {}
+  vendasFiltradas = computed(() => {
+    const termo = this.busca().toLowerCase().trim().replace(/^#/, '');
+    const filtro = this.filtroSelecionado();
+
+    return this.vendas()
+      .filter((venda) => filtro === 'TODOS' || venda.status === filtro)
+      .filter(
+        (venda) =>
+          !termo ||
+          identificacaoPedido(venda).toLowerCase().includes(termo) ||
+          (venda.nomeCliente ?? '').toLowerCase().includes(termo) ||
+          venda.id.toString() === termo,
+      )
+      .sort((a, b) => (b.dataCriacao ?? '').localeCompare(a.dataCriacao ?? ''));
+  });
+
+  totalFiltrado = computed(() =>
+    this.vendasFiltradas()
+      .filter((venda) => venda.status !== 'CANCELADO')
+      .reduce((total, venda) => total + venda.valorTotal, 0),
+  );
 
   ngOnInit() {
     this.carregar();
   }
 
   carregar() {
-    this.carregando = true;
+    this.carregando.set(true);
     this.vendaService.listar().subscribe({
       next: (vendas) => {
-        this.vendas = vendas;
-        this.carregando = false;
+        this.vendas.set(vendas);
+        this.carregando.set(false);
       },
       error: (erro) => {
-        this.erro = MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar o histórico de vendas.');
-        this.carregando = false;
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar o histórico de pedidos.'));
+        this.carregando.set(false);
       },
     });
   }
 
-  selecionarFiltro(filtro: string) {
-    this.filtroSelecionado = filtro;
+  proximoStatus(venda: Venda): StatusPedido | undefined {
+    return PROXIMO_STATUS[venda.status];
   }
 
-  identificacao(venda: Venda): string {
-    if (venda.mesa) {
-      return `Mesa ${venda.mesa.numero}`;
+  podeCancelar(venda: Venda): boolean {
+    return venda.status === 'ABERTO' || venda.status === 'EM_PREPARO';
+  }
+
+  avancar(venda: Venda) {
+    const proximo = this.proximoStatus(venda);
+    if (proximo) this.alterarStatus(venda, proximo);
+  }
+
+  cancelar(venda: Venda) {
+    const aviso =
+      venda.status === 'EM_PREPARO'
+        ? ' Os ingredientes já baixados do estoque não são devolvidos automaticamente.'
+        : '';
+    if (confirm(`Cancelar o pedido #${venda.id}?${aviso}`)) {
+      this.alterarStatus(venda, 'CANCELADO');
     }
-    return venda.nomeCliente || 'Balcão';
   }
 
-  totalVenda(venda: Venda): number {
-    return (venda.itens ?? []).reduce((total, item) => total + (item.valor_total ?? 0), 0);
-  }
+  private alterarStatus(venda: Venda, status: StatusPedido) {
+    this.processandoId.set(venda.id);
+    this.erro.set(null);
 
-  get vendasFiltradas(): Venda[] {
-    return this.vendas
-      .filter((venda) => this.filtroSelecionado === 'Todos' || venda.status === this.filtroSelecionado)
-      .filter((venda) => {
-        const termo = this.busca.toLowerCase().trim();
-        if (!termo) {
-          return true;
-        }
-        return this.identificacao(venda).toLowerCase().includes(termo) || venda.id.toString().includes(termo);
-      });
-  }
-
-  get totalFiltrado(): number {
-    return this.vendasFiltradas.reduce((total, venda) => total + this.totalVenda(venda), 0);
-  }
-
-  get totalVendas(): number {
-    return this.vendasFiltradas.length;
+    this.vendaService.atualizarStatus(venda.id, status).subscribe({
+      next: (atualizada) => {
+        this.vendas.update((lista) => lista.map((v) => (v.id === atualizada.id ? atualizada : v)));
+        this.processandoId.set(null);
+      },
+      error: (erro) => {
+        this.processandoId.set(null);
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível atualizar o status do pedido.'));
+      },
+    });
   }
 }

@@ -1,10 +1,12 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CampoSenhaComponent } from '../../components/campo-senha/campo-senha';
 import { CampoTextoComponent } from '../../components/campo-texto/campo-texto';
 import { AuthService } from '../auth/auth.service';
+import { MensagemErroApiUtil } from '../utils/mensagemErroApiUtil';
 
 @Component({
   selector: 'app-login',
@@ -14,15 +16,22 @@ import { AuthService } from '../auth/auth.service';
   standalone: true,
 })
 export class Login {
-  modoRecuperarSenha = false;
+  modoRecuperarSenha = signal(false);
   currentYear: number = new Date().getFullYear();
 
-  enviando = false;
-  erro: string | null = null;
+  enviando = signal(false);
+  erro = signal<string | null>(null);
 
   private fb = inject(FormBuilder);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private authService = inject(AuthService);
+
+  aviso = signal<string | null>(
+    this.route.snapshot.queryParamMap.get('sessao') === 'expirada'
+      ? 'Sua sessão expirou. Entre novamente para continuar.'
+      : null,
+  );
 
   form = this.fb.group({
     email: ['', Validators.required],
@@ -35,12 +44,12 @@ export class Login {
   };
 
   abrirRecuperarSenha() {
-    this.modoRecuperarSenha = true;
-    this.erro = null;
+    this.modoRecuperarSenha.set(true);
+    this.erro.set(null);
   }
 
   voltarParaLogin() {
-    this.modoRecuperarSenha = false;
+    this.modoRecuperarSenha.set(false);
   }
 
 
@@ -56,17 +65,25 @@ export class Login {
       return;
     }
 
-    this.enviando = true;
-    this.erro = null;
+    this.enviando.set(true);
+    this.erro.set(null);
+    this.aviso.set(null);
 
-    this.authService.login(email, password).subscribe({
+    this.authService.login(email.trim(), password).subscribe({
       next: () => {
-        this.enviando = false;
+        this.enviando.set(false);
         this.router.navigate(['/home']);
       },
-      error: () => {
-        this.enviando = false;
-        this.erro = 'E-mail ou senha inválidos.';
+      error: (erro: unknown) => {
+        this.enviando.set(false);
+        // Credencial errada chega como 401/403 (o Spring encaminha a exceção para /error).
+        const credencialInvalida =
+          erro instanceof HttpErrorResponse && [400, 401, 403, 500].includes(erro.status);
+        this.erro.set(
+          credencialInvalida
+            ? 'Usuário ou senha inválidos.'
+            : MensagemErroApiUtil.extrair(erro, 'Não foi possível entrar. Tente novamente.'),
+        );
       },
     });
   }

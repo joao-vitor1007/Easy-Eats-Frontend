@@ -1,50 +1,77 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { CarregandoComponent } from '../../components/carregando/carregando';
+import { FiltroPeriodoComponent } from '../../components/filtro-periodo/filtro-periodo';
+import {
+  STATUS_PEDIDO_LABEL,
+  TODOS_STATUS_PEDIDO,
+  Venda,
+  VendaService,
+  filtrarPorPeriodo,
+} from '../novo-pedido/venda.service';
+import { MensagemErroApiUtil } from '../utils/mensagemErroApiUtil';
+import { Periodo, PeriodoUtil } from '../utils/periodoUtil';
 
-interface LinhaStatus {
-  status: string;
-  cor: string;
-  quantidade: number;
-  valor: number;
-}
-
-interface LinhaDia {
-  dia: string;
-  pedidos: number;
-  valor: number;
-}
+const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 @Component({
   selector: 'app-relatorio-pedidos',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CurrencyPipe, DecimalPipe, CarregandoComponent, FiltroPeriodoComponent],
   templateUrl: './relatorio-pedidos.html',
   styleUrl: './relatorio-pedidos.scss',
 })
-export class RelatorioPedidos {
-  readonly totalPedidos = 86;
-  readonly ticketMedio = 47.35;
-  readonly valorTotal = 4072.1;
-  readonly taxaCancelamento = 3.5;
+export class RelatorioPedidos implements OnInit {
+  private vendaService = inject(VendaService);
 
-  readonly porStatus: LinhaStatus[] = [
-    { status: 'Entregue', cor: 'verde', quantidade: 64, valor: 3010.5 },
-    { status: 'Preparando', cor: 'laranja', quantidade: 9, valor: 421.0 },
-    { status: 'Aguardando', cor: 'azul', quantidade: 10, valor: 512.6 },
-    { status: 'Cancelado', cor: 'vermelho', quantidade: 3, valor: 128.0 },
-  ];
+  readonly statusLabel = STATUS_PEDIDO_LABEL;
 
-  readonly porDia: LinhaDia[] = [
-    { dia: 'Segunda', pedidos: 10, valor: 470.0 },
-    { dia: 'Terça', pedidos: 12, valor: 560.0 },
-    { dia: 'Quarta', pedidos: 14, valor: 610.0 },
-    { dia: 'Quinta', pedidos: 11, valor: 505.0 },
-    { dia: 'Sexta', pedidos: 16, valor: 780.0 },
-    { dia: 'Sábado', pedidos: 15, valor: 720.0 },
-    { dia: 'Domingo', pedidos: 8, valor: 427.1 },
-  ];
+  carregando = signal(true);
+  erro = signal<string | null>(null);
+  private todos = signal<Venda[]>([]);
+  periodo = signal<Periodo>(PeriodoUtil.resolver('hoje'));
 
-  get maiorValorDia(): number {
-    return Math.max(...this.porDia.map((d) => d.valor));
+  pedidos = computed(() => filtrarPorPeriodo(this.todos(), this.periodo().inicio, this.periodo().fim));
+  resumo = computed(() => VendaService.resumir(this.pedidos()));
+
+  taxaCancelamento = computed(() =>
+    this.pedidos().length ? (this.resumo().canceladas / this.pedidos().length) * 100 : 0,
+  );
+
+  porStatus = computed(() =>
+    TODOS_STATUS_PEDIDO.map((status) => {
+      const lista = this.pedidos().filter((p) => p.status === status);
+      return { status, quantidade: lista.length, valor: lista.reduce((s, p) => s + p.valorTotal, 0) };
+    }),
+  );
+
+  porDia = computed(() => {
+    const linhas = DIAS_SEMANA.map((dia) => ({ dia, pedidos: 0, valor: 0, altura: 0 }));
+    for (const pedido of this.pedidos()) {
+      if (!pedido.dataCriacao || pedido.status === 'CANCELADO') continue;
+      const linha = linhas[new Date(pedido.dataCriacao).getDay()];
+      linha.pedidos++;
+      linha.valor += pedido.valorTotal;
+    }
+    const maior = Math.max(1, ...linhas.map((l) => l.valor));
+    return linhas.map((l) => ({ ...l, altura: (l.valor / maior) * 100 }));
+  });
+
+  ngOnInit(): void {
+    this.carregar();
+  }
+
+  carregar(): void {
+    this.carregando.set(true);
+    this.vendaService.listar().subscribe({
+      next: (pedidos) => {
+        this.todos.set(pedidos);
+        this.carregando.set(false);
+      },
+      error: (erro) => {
+        this.erro.set(MensagemErroApiUtil.extrair(erro, 'Não foi possível carregar os pedidos.'));
+        this.carregando.set(false);
+      },
+    });
   }
 }

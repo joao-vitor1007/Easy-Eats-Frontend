@@ -1,20 +1,24 @@
-import { Component, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
-import { filter } from 'rxjs';
+import { catchError, filter, forkJoin, interval, of, startWith, switchMap } from 'rxjs';
 import { Sidebar } from '../../components/sidebar/sidebar';
-import { AuthService } from '../auth/auth.service';
+import { AuthService, PERFIL_LABEL, PERFIS_GESTAO } from '../auth/auth.service';
 import { ThemeService } from '../theme/theme.service';
+import { EstoqueService } from '../controle-estoque/estoque.service';
+import { VendaService } from '../novo-pedido/venda.service';
 
 const CHAVE_SIDEBAR_COLAPSADO = 'easyeats.sidebarColapsado';
+const INTERVALO_NOTIFICACOES_MS = 60_000;
 
 interface Notificacao {
+  chave: string;
   icone: string;
-  cor: string;
+  cor: 'laranja' | 'vermelho' | 'verde' | 'azul';
   titulo: string;
   descricao: string;
-  tempo: string;
-  lida: boolean;
+  rota: string;
 }
 
 @Component({
@@ -24,93 +28,88 @@ interface Notificacao {
   templateUrl: './app-layout.html',
   styleUrl: './app-layout.scss',
 })
-export class AppLayout {
+export class AppLayout implements OnInit {
+  authService = inject(AuthService);
+  themeService = inject(ThemeService);
+  private router = inject(Router);
+  private estoqueService = inject(EstoqueService);
+  private vendaService = inject(VendaService);
+  private destroyRef = inject(DestroyRef);
+
   colapsado = signal(localStorage.getItem(CHAVE_SIDEBAR_COLAPSADO) === 'true');
   notificacoesAbertas = signal(false);
   menuMobileAberto = signal(false);
 
-  private readonly notificacoesOperacional: Notificacao[] = [
-    {
-      icone: 'bi-cart-check',
-      cor: 'laranja',
-      titulo: 'Novo pedido recebido',
-      descricao: 'Mesa 4 — pedido #128 acabou de entrar na fila.',
-      tempo: 'há 5 min',
-      lida: false,
-    },
-    {
-      icone: 'bi-exclamation-triangle',
-      cor: 'vermelho',
-      titulo: 'Estoque crítico',
-      descricao: '"Batata Congelada" está abaixo do mínimo recomendado.',
-      tempo: 'há 22 min',
-      lida: false,
-    },
-    {
-      icone: 'bi-cash-coin',
-      cor: 'verde',
-      titulo: 'Pagamento confirmado',
-      descricao: 'Recebido via PIX — R$ 84,50.',
-      tempo: 'há 1 h',
-      lida: false,
-    },
-    {
-      icone: 'bi-truck',
-      cor: 'azul',
-      titulo: 'Entrega do fornecedor',
-      descricao: 'Distribuidora Boi Forte confirmou entrega para amanhã.',
-      tempo: 'ontem',
-      lida: true,
-    },
-  ];
+  /** Notificações reais, montadas a partir de GET /pedido?status=ABERTO e GET /estoques/alertas. */
+  notificacoes = signal<Notificacao[]>([]);
+  private lidas = new Set<string>();
 
-  private readonly notificacoesSuperadmin: Notificacao[] = [
-    {
-      icone: 'bi-building-add',
-      cor: 'azul',
-      titulo: 'Nova empresa cadastrada',
-      descricao: '"Cafeteria Grão Nobre" se cadastrou no plano Pro.',
-      tempo: 'há 12 min',
-      lida: false,
-    },
-    {
-      icone: 'bi-exclamation-triangle',
-      cor: 'vermelho',
-      titulo: 'Pagamento em atraso',
-      descricao: 'Pizzaria Bella Napoli está com a fatura vencida há 3 dias.',
-      tempo: 'há 40 min',
-      lida: false,
-    },
-    {
-      icone: 'bi-life-preserver',
-      cor: 'laranja',
-      titulo: 'Novo ticket de suporte',
-      descricao: 'Burger House Ltda abriu um chamado sobre integração com iFood.',
-      tempo: 'há 2 h',
-      lida: false,
-    },
-    {
-      icone: 'bi-graph-up-arrow',
-      cor: 'verde',
-      titulo: 'Meta de MRR atingida',
-      descricao: 'A receita recorrente mensal ultrapassou R$ 18.000,00 este mês.',
-      tempo: 'ontem',
-      lida: true,
-    },
-  ];
-
-  get notificacoes(): Notificacao[] {
-    return this.authService.isSuperadmin() ? this.notificacoesSuperadmin : this.notificacoesOperacional;
+  constructor() {
+    this.router.events
+      .pipe(
+        filter((evento) => evento instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        this.menuMobileAberto.set(false);
+        this.notificacoesAbertas.set(false);
+      });
   }
 
-  constructor(
-    public authService: AuthService,
-    public themeService: ThemeService,
-    private router: Router,
-  ) {
-    this.router.events.pipe(filter((evento) => evento instanceof NavigationEnd)).subscribe(() => {
-      this.menuMobileAberto.set(false);
-    });
+  ngOnInit(): void {
+    const gestao = this.authService.temPerfil(PERFIS_GESTAO);
+
+    interval(INTERVALO_NOTIFICACOES_MS)
+      .pipe(
+        startWith(0),
+        switchMap(() =>
+          forkJoin({
+            aguardando: this.vendaService.listarPorStatus('ABERTO').pipe(catchError(() => of([]))),
+            alertas: gestao ? this.estoqueService.listarAlertas().pipe(catchError(() => of([]))) : of([]),
+          }),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(({ aguardando, alertas }) => {
+        const lista: Notificacao[] = [];
+
+        if (aguardando.length > 0) {
+          lista.push({
+            chave: `aguardando-${aguardando.map((p) => p.id).join(',')}`,
+            icone: 'bi-cart-check',
+            cor: 'laranja',
+            titulo: aguardando.length === 1 ? '1 pedido aguardando' : `${aguardando.length} pedidos aguardando`,
+            descricao: 'Pedidos ainda não iniciados pela cozinha.',
+            rota: '/tela-cozinha',
+          });
+        }
+
+        for (const alerta of alertas) {
+          lista.push({
+            chave: `estoque-${alerta.id}-${alerta.qtdAtual}`,
+            icone: 'bi-exclamation-triangle',
+            cor: 'vermelho',
+            titulo: 'Repor estoque',
+            descricao: `${alerta.nomeIngrediente ?? 'Ingrediente'}: ${alerta.qtdAtual.toLocaleString('pt-BR')} (mínimo ${alerta.qtdMinima.toLocaleString('pt-BR')}).`,
+            rota: '/controle-estoque',
+          });
+        }
+
+        this.notificacoes.set(lista);
+      });
+  }
+
+  get labelPerfil(): string {
+    const role = this.authService.usuario()?.role;
+    return role ? PERFIL_LABEL[role] : '';
+  }
+
+  get naoLidas(): number {
+    return this.notificacoes().filter((n) => !this.lidas.has(n.chave)).length;
+  }
+
+  estaLida(notificacao: Notificacao): boolean {
+    return this.lidas.has(notificacao.chave);
   }
 
   alternarMenuMobile() {
@@ -119,10 +118,6 @@ export class AppLayout {
 
   fecharMenuMobile() {
     this.menuMobileAberto.set(false);
-  }
-
-  get naoLidas(): number {
-    return this.notificacoes.filter((n) => !n.lida).length;
   }
 
   alternarSidebar() {
@@ -135,22 +130,27 @@ export class AppLayout {
   }
 
   marcarTodasComoLidas() {
-    this.notificacoes.forEach((n) => (n.lida = true));
+    this.notificacoes().forEach((n) => this.lidas.add(n.chave));
+  }
+
+  abrirNotificacao(notificacao: Notificacao) {
+    this.lidas.add(notificacao.chave);
+    this.notificacoesAbertas.set(false);
+    this.router.navigate([notificacao.rota]);
   }
 
   get iniciais(): string {
     const nome = this.authService.usuario()?.nome ?? '';
     return nome
-      .split(' ')
+      .split(/[\s._@-]+/)
+      .filter(Boolean)
       .slice(0, 2)
       .map((parte) => parte.charAt(0).toUpperCase())
       .join('');
   }
 
   irParaPerfil() {
-    const role = this.authService.usuario()?.role;
-    const rota = role === 'OPERADOR' || role === 'GARCOM' ? '/perfil-garcom' : '/perfil-admin';
-    this.router.navigate([rota]);
+    this.router.navigate(['/perfil']);
   }
 
   sair() {
